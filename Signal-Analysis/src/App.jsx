@@ -4,6 +4,8 @@ import EEG from "./../Pages/EEG";
 import ECG from "./../Pages/ECG";
 import Sound from "./../Pages/Sound";
 import Doppler from "./../Pages/Doppler";
+import "../styles/doppler.css"
+
 function App() {
   return (
     <>
