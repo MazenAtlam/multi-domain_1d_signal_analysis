@@ -1,5 +1,23 @@
-export default function Input() {
+const Input = ({
+                   type = 'text',
+                   placeholder = '',
+                   value,
+                   onChange,
+                   className = '',
+                   required = true,
+                   ...props
+               }) => {
     return (
-        <div>Input</div>
+        <input
+            type={type}
+            className={`input ${className}`}
+            placeholder={placeholder}
+            value={value}
+            onChange={onChange}
+            required={required}
+            {...props}
+        />
     );
-}
+};
+
+export default Input;

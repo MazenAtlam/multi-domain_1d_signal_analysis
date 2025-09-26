@@ -1,5 +1,14 @@
-export default function Card() {
+const Card = ({
+                  children,
+                  className = '',
+                  padding = 'p-6',
+                  ...props
+              }) => {
     return (
-        <div>Card</div>
+        <div className={`card ${padding} ${className}`} {...props}>
+            {children}
+        </div>
     );
-}
+};
+
+export default Card;
