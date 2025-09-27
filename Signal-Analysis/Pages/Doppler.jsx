@@ -19,9 +19,9 @@ const Doppler = () => {
         <div className="bg-card/50 border-b border-border">
           <div className="container px-4 py-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center col-8 space-x-4">
+              <div className="flex items-center space-x-4">
                 <a href="/">
-                  <Button className="border-0">
+                  <Button className="button-scientific bg-background border-input rounded-md">
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
                         width="24"
@@ -41,7 +41,7 @@ const Doppler = () => {
                   </Button>
                 </a>
 
-                <div className="flex items-center col-5 space-x-3 justify-content-around">
+                <div className="flex items-center space-x-3 justify-between">
                   <div className="w-10 h-10 bg-signal-doppler/10 rounded-lg flex items-center justify-center">
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -61,7 +61,7 @@ const Doppler = () => {
                     </svg>
                   </div>
 
-                  <div>
+                  <div className="ms-3">
                     <h1 className="text-2xl font-bold text-foreground">Doppler Analysis</h1>
                     <p className="text-muted-foreground">Frequency & Velocity Signal Processing</p>
                   </div>
@@ -77,7 +77,7 @@ const Doppler = () => {
             {/* Action Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Generate Doppler Effect Card */}
-              <Card>
+              <Card className="d-flex align-items-center">
                 <div className="text-center space-y-4">
                   <div className="w-12 h-12 bg-signal-doppler/10 rounded-lg flex items-center justify-center mx-auto">
                     <svg
@@ -117,7 +117,7 @@ const Doppler = () => {
                       <Input placeholder="value" type="number" /> {/*onChange={(e) => setVelocity(e.target.value)}*/}
                     </div>
 
-                    <Button className="w-full bg-primary text-light"> {/*onClick={ai_submission}*/}
+                    <Button className="button-primary w-full border-0"> {/*onClick={ai_submission}*/}
                       Generate Signal
                     </Button>
                   </div>
@@ -175,9 +175,17 @@ const Doppler = () => {
                         <p className="text-muted-foreground text-sm">From audio dataset</p>
                       </div>
 
-                      <Button className="bg-signal-doppler bg-warning text-light hover:bg-signal-doppler/90">
-                        Load Some Data
-                      </Button>
+                      <div className="space-y-3">
+                        <Input
+                            type="file"
+                            accept="audio/*"
+                            className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                        />
+                        <p className="text-muted-foreground text-sm">or</p>
+                        <Button className="border-0 button-warning">
+                          Load Some Data
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -240,12 +248,12 @@ const Doppler = () => {
 
                     <div className="space-y-2">
                       <div className="progress-bar">
-                        <div className="progress-fill"></div>
+                        <div className="progress-fill bg-signal-doppler"></div>
                       </div>
                       <p className="text-sm text-muted-foreground">00:15 / 00:45</p>
                     </div>
 
-                    <Button>▶ Play Audio</Button>
+                    <Button className="button-scientific bg-background border-input rounded-md">▶ Play Audio</Button>
                   </div>
                 </div>
 
@@ -341,7 +349,7 @@ const Doppler = () => {
                   <line x1="12" x2="12.01" y1="16" y2="16"></line>
                 </svg>
 
-                <div>
+                <div className="ms-3">
                   <h3 className="font-medium text-foreground mb-2">Usage Guidelines</h3>
                   <ul className="text-sm text-muted-foreground space-y-1">
                     <li>• Audio signals should be sampled at minimum 44.1 kHz</li>
