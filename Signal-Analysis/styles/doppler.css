@@ -3,6 +3,19 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    --card: 0 0% 100%;
+    --border: 215 15% 88%;
+    --input: 215 15% 95%;
+    --background: 0 0% 98%;
+    --radius: 0.75rem;
+    /* Primary - Medical blue palette */
+    --primary: 212 85% 45%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 212 85% 65%;
+    /* Accent - Scientific teal */
+    --accent: 185 85% 50%;
+    --accent-foreground: 0 0% 100%;
+    --doppler-signal: 45 85% 55%;
 }
 
 body {
@@ -20,10 +33,6 @@ body {
 /* Utility classes */
 .min-h-screen {
     min-height: 100vh;
-}
-
-.bg-background {
-    background-color: #fafafa;
 }
 
 .flex {
@@ -207,8 +216,12 @@ body {
     background-color: #ffffff;
 }
 
+.bg-card\/50 {
+    background-color: hsl(var(--card) / 0.5);
+}
+
 .bg-background {
-    background-color: #fafafa;
+    background-color: hsl(var(--background));
 }
 
 .bg-signal-doppler {
@@ -249,7 +262,7 @@ body {
 }
 
 .border-input {
-    border-color: #d1d5db;
+    border-color: hsl(var(--input));
 }
 
 .border-dashed {
@@ -261,7 +274,7 @@ body {
 }
 
 .rounded-md {
-    border-radius: 0.375rem;
+    border-radius: calc(var(--radius) - 2px);
 }
 
 .rounded-full {
@@ -289,17 +302,12 @@ body {
     white-space: nowrap;
     font-size: 0.875rem;
     font-weight: 500;
-    border-radius: 0.375rem;
-    border: 1px solid #d1d5db;
-    background-color: white;
+    border-width: 1px;
+    border-radius: calc(var(--radius) - 2px);
+    border-style: solid;
     padding: 0.625rem 1rem;
     cursor: pointer;
     transition: all 0.2s;
-}
-
-.button:hover {
-    background-color: #f9fafb;
-    color: #374151;
 }
 
 .button-primary {
@@ -309,7 +317,22 @@ body {
 }
 
 .button-primary:hover {
-    background-color: #2563eb;
+    background-color: hsl(var(--primary) / .9);
+    color: hsl(var(--primary-foreground));
+}
+
+.button-warning {
+    background-color: hsl(var(--doppler-signal));
+    color: white;
+}
+
+.button-warning:hover {
+    background-color: hsl(var(--doppler-signal) / .9);
+}
+
+.button-scientific:hover {
+    background-color: hsl(var(--accent));
+    color: hsl(var(--accent-foreground));
 }
 
 .input {
@@ -439,7 +462,6 @@ body {
 }
 
 .progress-fill {
-    background-color: #3b82f6;
     border-radius: 9999px;
     height: 100%;
     width: 33.33%;
