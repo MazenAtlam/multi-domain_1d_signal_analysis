@@ -1,0 +1,67 @@
+.container{
+    max-width: 100% !important;
+}
+@media screen and (min-width:1012px) {
+    .container{
+        padding-inline: 200px !important;
+    }   
+    .modes{
+        gap: 0;
+    }
+}
+.tempNav .btn a{
+    color: black !important;
+    font-weight: 600 !important;
+}
+.modes .btn , .data .btn:nth-child(2) {
+    color: black !important;
+    font-weight: 600 !important;
+}
+.tempNav .btn:hover , .modes .btn:hover ,.data .btn:nth-child(2):hover{
+    background-color: #29C8ED !important;
+    color: White !important;
+}
+.tempNav .btn:hover > a{
+    color: White !important;
+}
+.brain{
+    color: #6C2BEE;
+    background-color: #F0E9FD;
+}
+.activity{
+    color: #EE2B2B;
+    background-color: #F2E1E5;
+}
+.radar{
+    color: #11D411;
+    background-color: #DCF4E5;
+}
+.waves{
+    color: #EEBD2B;
+    background-color: #F2F1E5;
+}
+.signalViewer{
+    background-color: #FFF !important;
+}
+.view{
+    border: 2px dashed #c7c7c7;
+}
+.file{
+    background-color: #116CD4;
+    color: #FFF;
+    font-size: 15px;
+    font-weight: 500;
+}
+.sendData{
+    background-color: #6C2BEE;
+    color: #FFF;
+    padding: 5px 15px;
+    border-radius: 10px;
+}
+.card {
+    border: 1px solid #e2e2e2 !important;
+}
+ul li {
+    color: #707070;
+}
+
