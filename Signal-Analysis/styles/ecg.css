@@ -1,4 +1,4 @@
-/* ECG.css */
+ECG.css
 
 .btn-danger {
   background-color: #dc3545;
@@ -35,3 +35,7 @@
   font-size: 28px;
   color: #28a745;
 }
+/* add to ecg.css */
+.mode-fade { transition: opacity 280ms ease; }
+.mode-fade.hidden { opacity: 0; pointer-events: none; }
+.mode-fade.show { opacity: 1; }
