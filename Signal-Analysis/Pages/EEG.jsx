@@ -1,7 +1,7 @@
-import FeatureCard from "../src/Components/EEG/FeatureCard";
-import Instructions from "../src/Components/EEG/Instructions";
-import SignalViewerCard from "../src/Components/EEG/SignalViewerCard";
-import TempNav from "../src/Components/EEG/tempNav";
+import FeatureCard from "../src/Components/EEG_ECG/FeatureCard";
+import Instructions from "../src/Components/EEG_ECG/Instructions";
+import SignalViewerCard from "../src/Components/EEG_ECG/SignalViewerCard";
+import TempNav from "../src/Components/EEG_ECG/tempNav";
 import { Activity, Brain, Radar, Waves } from "lucide-react";
 export default function EEG() {
   return (
