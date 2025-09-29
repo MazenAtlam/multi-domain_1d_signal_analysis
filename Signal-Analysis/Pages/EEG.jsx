@@ -43,7 +43,13 @@ export default function EEG() {
             fetDes={"Detailed spectral analysis of brain wave frequencies"}
           />
         </div>
-        <Instructions />
+        <Instructions
+          li1={"EEG signals should be sampled at minimum 256 Hz"}
+          li2={"File formats: EDF, CSV, TXT, or MAT with multi-channel data"}
+          li3={"Maximum file size: 50MB per upload"}
+          li4={"For best results, use 10-20 electrode system recordings"}
+          li5={"Include channel labels and sampling frequency information"}
+        />
       </div>
     </>
   );
