@@ -485,3 +485,129 @@ body {
 .pt-4 {
     padding-top: 1rem;
 }
+
+/* Message styles */
+.message-success {
+    background-color: #d1fae5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin: 1rem 0;
+}
+
+.message-error {
+    background-color: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin: 1rem 0;
+}
+
+/* Loading spinner */
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Disabled state styles */
+.input:disabled {
+    background-color: #f3f4f6;
+    color: #9ca3af;
+    cursor: not-allowed;
+}
+
+.button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.button:disabled:hover {
+    transform: none;
+}
+
+/* Audio Player Specific Styles */
+.cursor-pointer {
+    cursor: pointer;
+}
+
+/* Progress bar interactivity */
+.progress-bar {
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.progress-bar:hover {
+    transform: scale(1.02);
+}
+
+.progress-fill {
+    transition: width 0.1s ease;
+}
+
+/* Audio control buttons */
+.audio-controls {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Status indicators */
+.audio-status {
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    margin: 0.5rem 0;
+}
+
+.audio-status.ready {
+    background-color: #d1fae5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+}
+
+.audio-status.loading {
+    background-color: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+}
+
+/* Button states */
+.button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+.button:disabled:hover {
+    transform: none !important;
+}
+
+/* Hidden audio element */
+audio {
+    display: none;
+}
+
+/* Responsive audio controls */
+@media (max-width: 640px) {
+    .audio-controls {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .audio-controls .button {
+        width: 100%;
+        justify-content: center;
+    }
+}
