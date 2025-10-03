@@ -37,6 +37,8 @@ export default function SignalViewerCard(props) {
     onClick3,
     onClick4,
     onClick5,
+    fileInputRef,
+    onFileChange,
   } = props;
 
   const IconComponent = props.icon;
@@ -72,7 +74,7 @@ export default function SignalViewerCard(props) {
   const handleClick4 = () => {
     console.log("Button 4 clicked - Choose File");
     if (onClick4) {
-      onClick4();
+      onClick4(); // This calls handleFileButtonClick from parent
     } else {
       console.error("onClick4 is not defined");
     }
@@ -384,6 +386,14 @@ export default function SignalViewerCard(props) {
           </div>
 
           <div className="data my-3">
+            <input
+              type="file"
+              className="btn p-2 rounded-3 mx-5 file"
+              onChange={onFileChange}
+              ref={fileInputRef}
+              style={{ display: "none" }}
+              accept=".csv,.txt,.edf,.dat"
+            />
             <button
               className="btn p-2 rounded-3 mx-5 file"
               onClick={handleClick4}

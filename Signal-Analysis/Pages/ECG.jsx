@@ -6,7 +6,6 @@ import React, { useRef, useState, useCallback } from "react";
 import Card from "../src/Components/ui/card";
 import Button from "../src/Components/ui/button";
 import "../styles/ecg.css";
-
 import { parseCsv } from "../src/utils/parseCsv";
 import { detectMainChannels } from "../src/utils/detectMainChannels";
 import { Activity as LucideActivity } from "lucide-react";
