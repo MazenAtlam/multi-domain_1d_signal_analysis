@@ -1,7 +1,7 @@
 // src/utils/parseCsv.js
 import Papa from "papaparse";
 
-export function parseCsvFile(file) {
+export function parseCsv(file) {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
       dynamicTyping: true,
