@@ -7,7 +7,6 @@ const SoundVisualizer = ({ file, audioRef }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Process the audio file and extract waveform data
   useEffect(() => {
     if (!file) return;
 
