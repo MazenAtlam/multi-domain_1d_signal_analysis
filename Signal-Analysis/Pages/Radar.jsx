@@ -12,6 +12,7 @@ const Radar = () => {
 
   const handleAudioFileChange = (event) => {
     const file = event.target.files[0];
+    event.target.value = '';
     if (file) {
       setCurrentFile(file);
       setFileType('audio');
@@ -20,6 +21,7 @@ const Radar = () => {
 
   const handleRfFileChange = (event) => {
     const file = event.target.files[0];
+    event.target.value = '';
     if (file) {
       setCurrentFile(file);
       setFileType('rf');
