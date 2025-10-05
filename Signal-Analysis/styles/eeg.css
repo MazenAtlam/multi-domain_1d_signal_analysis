@@ -24,19 +24,19 @@
 .tempNav .btn:hover > a{
     color: White !important;
 }
-.brain{
+.Brain{
     color: #6C2BEE;
     background-color: #F0E9FD;
 }
-.activity{
+.Activity{
     color: #EE2B2B;
     background-color: #F2E1E5;
 }
-.radar{
+.Radar{
     color: #11D411;
     background-color: #DCF4E5;
 }
-.waves{
+.Waves{
     color: #EEBD2B;
     background-color: #F2F1E5;
 }
