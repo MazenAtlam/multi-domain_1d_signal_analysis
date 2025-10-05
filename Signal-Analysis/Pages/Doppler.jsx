@@ -26,7 +26,27 @@ const Doppler = () => {
   // Refs
   const audioRef = useRef(null);
   const progressIntervalRef = useRef(null);
+  const frequencyRef = useRef(null);
+  const velocityRef = useRef(null);
+  const durationRef = useRef(null);
+
   const [selectedFile, setSelectedFile] = useState(null);
+
+  const resetInputs = () => {
+    setFrequency('');
+    frequencyRef.current.value = '';
+    setVelocity('');
+    velocityRef.current.value = '';
+    setDuration('');
+    durationRef.current.value = '';
+  }
+
+  const resetParameters = () => {
+    setSelectedFile(null);
+    setCurrentTime(0);
+    setAudioUrl(null);
+    setAudioLoaded(false);
+  }
 
   const isAudioFile = (file) => {
     // Check MIME type first
@@ -92,7 +112,10 @@ const Doppler = () => {
 
   // Function to handle choosing file
   const handleChooseFile = async (e) => {
+    resetParameters();
+
     const fileSelected = e.target.files[0];
+    e.target.value = '';
     setLoading(true);
     // Delay
     setMessage('');
@@ -139,6 +162,8 @@ const Doppler = () => {
 
   // Function to handle the load some data
   const handleLoadSomeData = async () => {
+    resetParameters();
+
     setLoading(true);
     // Delay
     setMessage('');
@@ -175,9 +200,12 @@ const Doppler = () => {
 
   // Function to handle the API request
   const handleGenerateSignal = async () => {
+    resetParameters();
+
     // Validate inputs
     if (!frequency || !velocity || !duration) {
-      setMessage('Please enter both frequency and velocity values.');
+      setMessage('Please enter frequency, velocity, and duration values.');
+      resetInputs();
       return;
     }
 
@@ -187,7 +215,8 @@ const Doppler = () => {
     const durNum = parseFloat(duration);
 
     if (isNaN(freqNum) || isNaN(velNum) || isNaN(durNum)) {
-      setMessage('Please enter valid numbers for frequency and velocity.');
+      setMessage('Please enter valid numbers for frequency, velocity, and duration.');
+      resetInputs();
       return;
     }
 
@@ -197,6 +226,7 @@ const Doppler = () => {
       setMessage('- Frequency must be in range 100-800 Hz\n' +
                        '- Velocity must be in range 5-60 m/s\n' +
                        '- Duration must be in range 1-8 sec');
+      resetInputs();
       return;
     }
 
@@ -228,6 +258,7 @@ const Doppler = () => {
       // Check if the request was successful
       if (!response.ok) {
         setMessage(`Failed to fetch! status: ${response.status}`);
+        resetInputs();
         return;
       }
 
@@ -245,6 +276,7 @@ const Doppler = () => {
     } catch (error) {
       console.error('Error generating signal:', error);
       setMessage(`Failed to generate signal: ${error.message}`);
+      resetInputs();
     } finally {
       setLoading(false);
     }
@@ -310,19 +342,6 @@ const Doppler = () => {
     }
   };
 
-  // // Function to handle progress bar click (seek)
-  // const handleProgressClick = (e) => {
-  //   if (audioRef.current && audioLoaded) {
-  //     const progressBar = e.currentTarget;
-  //     const clickPosition = e.clientX - progressBar.getBoundingClientRect().left;
-  //     const progressBarWidth = progressBar.clientWidth;
-  //     const seekTime = (clickPosition / progressBarWidth) * parseFloat(duration);
-  //
-  //     audioRef.current.currentTime = seekTime;
-  //     setCurrentTime(seekTime);
-  //   }
-  // };
-
   // Function to format time (seconds to MM:SS)
   const formatTime = (timeInSeconds) => {
     const minutes = Math.floor(timeInSeconds / 60);
@@ -330,9 +349,26 @@ const Doppler = () => {
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // // Calculate progress percentage
-  // const durationNum = parseFloat(duration);
-  // const progressPercentage = durationNum > 0 ? (currentTime / durationNum) * 100 : 0;
+  useEffect(() => {
+    // Focus the input when component mounts
+    if (frequencyRef.current) {
+      frequencyRef.current.focus();
+    }
+  }, []);
+
+  useEffect(() => {
+    // Focus the input when component mounts
+    if (velocityRef.current) {
+      velocityRef.current.focus();
+    }
+  }, []);
+
+  useEffect(() => {
+    // Focus the input when component mounts
+    if (durationRef.current) {
+      durationRef.current.focus();
+    }
+  }, []);
 
   // Cleanup on component unmount
   useEffect(() => {
@@ -443,7 +479,7 @@ const Doppler = () => {
                     </svg>
                   </div>
 
-                  <h3 className="text-xl font-semibold text-card-foreground">Generate Doppler Effect</h3>
+                  <h3>Generate Doppler Effect</h3>
                   <p className="text-muted-foreground text-sm">
                     Simulate Doppler shift using custom velocity and frequency parameters
                   </p>
@@ -453,21 +489,21 @@ const Doppler = () => {
                       <label className="text-sm font-medium text-card-foreground mb-2 block">
                         Source Frequency (Hz)
                       </label>
-                      <Input type="number" onChange={(e) => setFrequency(e.target.value)} />
+                      <Input ref={frequencyRef} type="number" onChange={(e) => setFrequency(e.target.value)} />
                     </div>
 
                     <div>
                       <label className="text-sm font-medium text-card-foreground mb-2 block">
                         Velocity (m/s)
                       </label>
-                      <Input type="number" onChange={(e) => setVelocity(e.target.value)} />
+                      <Input ref={velocityRef} type="number" onChange={(e) => setVelocity(e.target.value)} />
                     </div>
 
                     <div>
                       <label className="text-sm font-medium text-card-foreground mb-2 block">
                         Duration (sec)
                       </label>
-                      <Input type="number" onChange={(e) => setDuration(e.target.value)} />
+                      <Input ref={durationRef} type="number" onChange={(e) => setDuration(e.target.value)} />
                     </div>
 
                     <Button
@@ -510,7 +546,7 @@ const Doppler = () => {
                     )}
                   </div>
 
-                  <h3 className="text-xl font-semibold text-card-foreground">Analyze Doppler Signal</h3>
+                  <h3>Analyze Doppler Signal</h3>
                   <p className="text-muted-foreground text-sm">
                     Extract velocity and frequency information from audio signals
                   </p>
@@ -543,7 +579,7 @@ const Doppler = () => {
                         <Input
                             type="file"
                             accept="audio/*"
-                            className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                            className="input-file"
                             onChange={handleChooseFile}
                         />
                         <p className="text-muted-foreground text-sm">or</p>
@@ -564,23 +600,29 @@ const Doppler = () => {
             <Card className="p-8">
               <div className="space-y-6">
                 <div className="text-center space-y-4">
-                  <div className="w-16 h-16 bg-signal-doppler/10 rounded-full flex items-center justify-center mx-auto">
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="24"
-                        height="24"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="w-8 h-8 text-signal-doppler"
-                    >
-                      <path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"></path>
-                      <path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"></path>
-                      <path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"></path>
-                    </svg>
+                  <div className="w-20 h-20 bg-signal-doppler/10 rounded-full flex items-center justify-center mx-auto">
+                    {audioUrl ? (
+                        <div className="text-signal-doppler text-4xl">
+                          {isPlaying ? '🔊' : '🎵'}
+                        </div>
+                    ) : (
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="44"
+                            height="44"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="w-14 h-14 text-signal-doppler"
+                        >
+                          <path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"></path>
+                          <path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"></path>
+                          <path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"></path>
+                        </svg>
+                    )}
                   </div>
 
                   <div>
@@ -603,72 +645,29 @@ const Doppler = () => {
 
                 <div className="audio-player">
                   <div className="text-center space-y-4">
-                    <div className="w-20 h-20 bg-signal-doppler/10 rounded-full flex items-center justify-center mx-auto">
-                      {audioUrl ? (
-                          <div className="text-signal-doppler text-4xl">
-                            {isPlaying ? '🔊' : '🎵'}
-                          </div>
-                      ) : (
-                          <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="44"
-                              height="44"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="w-14 h-14 text-signal-doppler"
-                          >
-                            <path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"></path>
-                            <path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"></path>
-                            <path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"></path>
-                          </svg>
-                      )}
-                    </div>
-
                     <div className="space-y-2">
                       <SoundVisualizer file={selectedFile} audioRef={audioRef} />
                       <p className="text-sm text-muted-foreground">{formatTime(currentTime)} / {duration ? formatTime(parseFloat(duration)) : formatTime(0)}</p>
                     </div>
 
-                    {audioUrl ? (
-                        <div className="flex justify-center space-x-4">
+                    <div className="flex justify-center space-x-4">
                           {isPlaying ? (
                               <Button
-                                  className="text-lg bg-red-500 hover:bg-red-600 text-white"
+                                  className="button btn btn-outline-danger"
                                   onClick={handlePauseAudio}
                               >
                                 ⏸️ Pause Audio
                               </Button>
                           ) : (
                               <Button
-                                  className="text-lg bg-green-500 hover:bg-green-600 text-white"
+                                  className="button player-btn button-scientific"
                                   onClick={handlePlayAudio}
                                   disabled={!audioLoaded}
                               >
-                                ▶ Play Audio
+                                ▶️ Play Audio
                               </Button>
                           )}
-                          <Button
-                              className="text-lg"
-                              onClick={() => {
-                                handlePauseAudio();
-                                setCurrentTime(0);
-                                if (audioRef.current) {
-                                  audioRef.current.currentTime = 0;
-                                }
-                              }}
-                          >
-                            ⏹️ Stop
-                          </Button>
                         </div>
-                    ) : (
-                        <Button className="text-lg" disabled>
-                          Generate Signal First
-                        </Button>
-                    )}
                   </div>
                 </div>
 
@@ -684,15 +683,16 @@ const Doppler = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <Card>
                     <div className="text-center space-y-3">
-                      <h3 className="font-semibold text-card-foreground">Velocity</h3>
-                      <div className="text-3xl font-bold text-signal-doppler">{velocity || '0'}</div>
+                      <h3>Velocity</h3>
+                      <div className="text-3xl font-bold text-signal-doppler">{velocity || '0'} m/s</div>
+                      <p className="text-sm text-muted-foreground">({(parseFloat(velocity) * 3.6) || '0'} km/h)</p>
                       <p className="text-sm text-muted-foreground">Calculated velocity</p>
                     </div>
                   </Card>
 
                   <Card>
                     <div className="text-center space-y-3">
-                      <h3 className="font-semibold text-card-foreground">Frequency</h3>
+                      <h3>Frequency</h3>
                       <div className="text-3xl font-bold text-signal-doppler">{frequency || '0'} Hz</div>
                       <p className="text-sm text-muted-foreground">Source frequency</p>
                     </div>
@@ -744,7 +744,7 @@ const Doppler = () => {
                       </svg>
 
                       <div>
-                        <h3 className="font-semibold text-card-foreground mb-2">{feature.title}</h3>
+                        <h3>{feature.title}</h3>
                         <p className="text-muted-foreground text-sm">{feature.description}</p>
                       </div>
                     </div>
@@ -773,7 +773,7 @@ const Doppler = () => {
                 </svg>
 
                 <div className="ms-3">
-                  <h3 className="font-medium text-foreground mb-2">Usage Guidelines</h3>
+                  <h3>Usage Guidelines</h3>
                   <ul className="text-sm text-muted-foreground space-y-1">
                     <li>• Audio signals should be sampled at minimum 44.1 kHz</li>
                     <li>• For generation: Enter source frequency (100-800 Hz) and velocity (5 to 60 m/s)</li>
