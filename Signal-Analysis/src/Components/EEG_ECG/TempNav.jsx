@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import "../../../styles/eeg.css";
 export default function tempNav(props) {
   const IconComponent = props.icon;
+  console.log(props.icon.render.displayName);
   return (
     <>
       <div className="tempNav d-flex py-3 align-items-center bg-body-tertiary container w-100 border-bottom">
@@ -12,7 +13,7 @@ export default function tempNav(props) {
         </button>
         <div className="content d-flex align-items-center gap-4 my-auto">
           <IconComponent
-            className={"rounded-4 brain"}
+            className={`${props.icon.render.displayName} rounded-4`}
             style={{ width: "48px", height: "48px", padding: "5px" }}
           />
           <div className="head">

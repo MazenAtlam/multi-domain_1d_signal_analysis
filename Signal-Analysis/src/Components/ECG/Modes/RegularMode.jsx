@@ -10,7 +10,7 @@ const RegularMode = ({
   speed = 1,
   windowSec = 5,
   amplitudeScale = 1,
-  onFinish = () => {}
+  onFinish = () => {},
 }) => {
   const svgRef = useRef(null);
   const containerRef = useRef(null);
@@ -29,13 +29,13 @@ const RegularMode = ({
         const { width, height } = containerRef.current.getBoundingClientRect();
         setDimensions({
           width: Math.max(400, width),
-          height: Math.max(200, height - 20)
+          height: Math.max(150, height - 20),
         });
       }
     };
     updateDimensions();
-    window.addEventListener('resize', updateDimensions);
-    return () => window.removeEventListener('resize', updateDimensions);
+    window.addEventListener("resize", updateDimensions);
+    return () => window.removeEventListener("resize", updateDimensions);
   }, []);
 
   // initialize buffers on selected change or bufLen change
@@ -63,12 +63,13 @@ const RegularMode = ({
     const { width, height } = dimensions;
     svg.attr("viewBox", `0 0 ${width} ${height}`);
 
-    const x = d3.scaleLinear()
+    const x = d3
+      .scaleLinear()
       .domain([0, bufLen - 1])
       .range([40, width - 10]);
 
     // prepare displayed buffers (last bufLen)
-    const displayed = buffersRef.current.map(buf => {
+    const displayed = buffersRef.current.map((buf) => {
       const b = buf.slice(-bufLen);
       if (b.length < bufLen) {
         const pad = new Array(bufLen - b.length).fill(0);
@@ -78,33 +79,42 @@ const RegularMode = ({
     });
 
     // compute y domain on displayed values (apply amplitudeScale)
-    const allValues = displayed.flat().map(v => (isFinite(v) ? v * amplitudeScale : 0));
+    const allValues = displayed
+      .flat()
+      .map((v) => (isFinite(v) ? v * amplitudeScale : 0));
     let yMin = d3.min(allValues);
     let yMax = d3.max(allValues);
 
     if (!isFinite(yMin) || !isFinite(yMax)) {
-      yMin = -1; yMax = 1;
+      yMin = -1;
+      yMax = 1;
     }
-    if (yMin === yMax) { yMin -= 1; yMax += 1; }
+    if (yMin === yMax) {
+      yMin -= 1;
+      yMax += 1;
+    }
 
     const yPadding = (yMax - yMin) * 0.08;
-    const y = d3.scaleLinear()
+    const y = d3
+      .scaleLinear()
       .domain([yMin - yPadding, yMax + yPadding])
       .range([height - 20, 10]);
 
-    const line = d3.line()
+    const line = d3
+      .line()
       .x((d, i) => x(i))
-      .y(d => y((isFinite(d) ? d : 0) * amplitudeScale))
+      .y((d) => y((isFinite(d) ? d : 0) * amplitudeScale))
       .curve(d3.curveMonotoneX);
 
     // draw lines
     const g = svg.select(".lines");
     const paths = g.selectAll("path").data(displayed);
 
-    paths.enter()
+    paths
+      .enter()
       .append("path")
       .merge(paths)
-      .attr("d", d => line(d))
+      .attr("d", (d) => line(d))
       .attr("fill", "none")
       .attr("stroke", (d, i) => d3.schemeCategory10[i % 10])
       .attr("stroke-width", 1.5)
@@ -114,20 +124,22 @@ const RegularMode = ({
 
     // y axis
     const yAxis = d3.axisLeft(y).ticks(5);
-    svg.select(".axis-y")
-      .attr("transform", `translate(35,0)`)
-      .call(yAxis);
+    svg.select(".axis-y").attr("transform", `translate(35,0)`).call(yAxis);
 
     // x axis: show seconds for window
     const totalTime = bufLen / samplingRate;
-    const xTime = d3.scaleLinear()
+    const xTime = d3
+      .scaleLinear()
       .domain([0, totalTime])
       .range([40, width - 10]);
-    const xAxis = d3.axisBottom(xTime).ticks(5).tickFormat(d => `${d.toFixed(1)}s`);
-    svg.select(".axis-x")
+    const xAxis = d3
+      .axisBottom(xTime)
+      .ticks(5)
+      .tickFormat((d) => `${d.toFixed(1)}s`);
+    svg
+      .select(".axis-x")
       .attr("transform", `translate(0,${height - 15})`)
       .call(xAxis);
-
   }, [dimensions, bufLen, samplingRate, amplitudeScale]);
 
   // animation loop
@@ -137,11 +149,15 @@ const RegularMode = ({
     const step = (timestamp) => {
       if (!startRef.current) startRef.current = timestamp;
       const elapsedMs = timestamp - startRef.current;
-      const desiredSample = Math.floor((elapsedMs / 1000) * samplingRate * speed);
+      const desiredSample = Math.floor(
+        (elapsedMs / 1000) * samplingRate * speed
+      );
       const last = lastIdxRef.current;
 
       // compute max available index among selected channels
-      const lengths = selected.map(si => (channels[si] ? channels[si].length : 0)).filter(l => l > 0);
+      const lengths = selected
+        .map((si) => (channels[si] ? channels[si].length : 0))
+        .filter((l) => l > 0);
       const maxIdx = lengths.length > 0 ? Math.min(...lengths) - 1 : -1;
 
       if (desiredSample > last && channels.length > 0 && maxIdx >= 0) {
@@ -152,9 +168,9 @@ const RegularMode = ({
           selected.forEach((chanIdx, si) => {
             const buf = buffersRef.current[si] || (buffersRef.current[si] = []);
             const channelData = channels[chanIdx] || [];
-            const newSlice = channelData.slice(last + 1, upto + 1).map(v =>
-              (v != null && isFinite(v)) ? v : 0
-            );
+            const newSlice = channelData
+              .slice(last + 1, upto + 1)
+              .map((v) => (v != null && isFinite(v) ? v : 0));
             buf.push(...newSlice);
             if (buf.length > bufLen) {
               buf.splice(0, buf.length - bufLen); // قص من البداية بدل shift
@@ -166,8 +182,11 @@ const RegularMode = ({
         }
       }
 
-      // if we've reached the end of data, notify parent (so it can stop playing)
-      if (lastIdxRef.current >= 0 && maxIdx >= 0 && lastIdxRef.current >= maxIdx) {
+      if (
+        lastIdxRef.current >= 0 &&
+        maxIdx >= 0 &&
+        lastIdxRef.current >= maxIdx
+      ) {
         onFinish();
         return;
       }
@@ -196,7 +215,16 @@ const RegularMode = ({
         rafRef.current = null;
       }
     };
-  }, [playing, channels, selected, samplingRate, speed, bufLen, draw, onFinish]);
+  }, [
+    playing,
+    channels,
+    selected,
+    samplingRate,
+    speed,
+    bufLen,
+    draw,
+    onFinish,
+  ]);
 
   // redraw on resize / amplitude change
   useEffect(() => {
@@ -206,19 +234,23 @@ const RegularMode = ({
   }, [dimensions, draw, amplitudeScale]);
 
   return (
-    <div ref={containerRef} style={{ width: "100%", height: "100%" }}>
+    <div
+      ref={containerRef}
+      style={{ width: "100%", height: "100%", marginBlock: "10px" }}
+    >
       <svg
         ref={svgRef}
         style={{
           width: "100%",
           height: "100%",
           background: "#f8f9fa",
-          borderRadius: "4px"
+          borderRadius: "4px",
         }}
       />
       <div className="d-flex gap-2 mt-2 justify-content-center">
         <small className="text-muted">
-          Window: {Math.round(bufLen / samplingRate)}s | Samples: {bufLen} | Rate: {samplingRate}Hz
+          Window: {Math.round(bufLen / samplingRate)}s | Samples: {bufLen} |
+          Rate: {samplingRate}Hz
         </small>
       </div>
     </div>
