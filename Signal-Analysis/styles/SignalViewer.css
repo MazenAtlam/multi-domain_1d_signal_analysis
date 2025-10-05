@@ -1,0 +1,53 @@
+.signal-viewer-card {
+    width: 100%;
+}
+
+.signal-viewer-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.signal-viewer-icon {
+    background-color: rgba(34, 197, 94, 0.1);
+}
+
+.signal-viewer-icon svg {
+    color: hsl(var(--success));
+}
+
+.signal-header {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.signal-subtitle {
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+.file-name {
+    color: #6b7280;
+    font-size: 0.75rem;
+}
+
+.signal-canvas-container {
+    background-color: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 1rem;
+}
+
+.signal-canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.no-signal {
+    text-align: center;
+    padding: 2rem;
+    color: #6b7280;
+}

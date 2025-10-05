@@ -1,6 +1,21 @@
 *{
-    margin: 0px;
-    padding: 0px;
+    margin: 0;
+    padding: 0;
     box-sizing: border-box;
-}
 
+    --card: 0 0% 100%;
+    --border: 215 15% 88%;
+    --input: 215 15% 95%;
+    --background: 0 0% 98%;
+    --radius: 0.75rem;
+    /* Primary - Medical blue palette */
+    --primary: 212 85% 45%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 212 85% 65%;
+    /* Accent - Scientific teal */
+    --accent: 185 85% 50%;
+    --accent-foreground: 0 0% 100%;
+    --doppler-signal: 45 85% 55%;
+
+    --success: 120 85% 45%;
+}
