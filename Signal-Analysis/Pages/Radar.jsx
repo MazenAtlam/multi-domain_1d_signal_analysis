@@ -24,9 +24,33 @@ const Radar = () => {
   const [audioLoaded, setAudioLoaded] = useState(false);
   const [duration, setDuration] = useState('');
   const [audioFileIndex, setAudioFileIndex] = useState(0);
+  const [sarFileIndex, setSarFileIndex] = useState(0);
   const audioFilesNumber = 5;
+  const sarFilesNumber = 5;
   const [message, setMessage] = useState('');
   const [errorHappened, setErrorHappened] = useState(false);
+
+  const isSarFile = (file) => {
+    if (!file) return false;
+
+    const fileName = file.name.toLowerCase();
+    const fileType = file.type.toLowerCase();
+
+    // Check by file extension
+    const allowedExtensions = ['.txt', '.csv', '.dat'];
+    const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
+
+    // Check by MIME type (optional additional validation)
+    const allowedMimeTypes = [
+      'text/plain',
+      'text/csv',
+      'application/csv',
+      'text/comma-separated-values'
+    ];
+    const hasValidMimeType = allowedMimeTypes.includes(fileType) || fileType === '';
+
+    return hasValidExtension && hasValidMimeType;
+  };
 
   const resetParameters = () => {
     setCurrentFile(null);
@@ -34,6 +58,7 @@ const Radar = () => {
     setAudioUrl(null);
     setAudioLoaded(false);
     setErrorHappened(false);
+    setIsPlaying(false);
   }
 
   // Function to handle audio play
@@ -116,7 +141,6 @@ const Radar = () => {
     setSarData(null);
 
     setLoading(true);
-    // Delay
     setMessage('');
 
     try {
@@ -141,17 +165,24 @@ const Radar = () => {
 
     const file = event.target.files[0];
     event.target.value = '';
-    if (file === undefined) {
+    if (file === undefined || !isSarFile(file)) {
+      setMessage('Please select a valid SAR file (TXT, CSV, DAT)');
       setErrorHappened(true);
+      return;
     }
 
     setLoading(true);
-    // Delay
     setMessage('');
 
     try {
       const parsedData = await parseSarFile(file);
       setSarData(parsedData);
+      setCurrentFile(file);
+      setFileType('sar');
+
+      const analysisResult = await analyzeSarData(file);
+      console.log('SAR analysis result:', analysisResult);
+      setMessage("SAR analysis completed successfully.");
     } catch (error) {
       console.error('Error parsing SAR file:', error);
       setMessage('Error parsing SAR file:' + error);
@@ -263,20 +294,17 @@ const Radar = () => {
     };
   };
 
-  const fileFromAudioRef = async (audioReference, audioSrc, filename) => {
-    console.log(audioReference.current);
-    console.log(audioSrc);
-    if (!audioReference.current || !audioSrc) return null;
-    const response = await fetch(audioSrc);
+  const fileFromReference = async (fileUrl, filename, fileType) => {
+    if (!fileUrl) return null;
+    const response = await fetch(fileUrl);
     const data = await response.blob();
-    return new File([data], filename, { type: data.type });
+    return new File([data], filename, { type: fileType });
   };
 
   const handleLoadSampleAudio = async () => {
     resetParameters();
 
     setLoading(true);
-    // Delay
     setMessage('');
 
     // Get sample data from dataset folder
@@ -290,7 +318,7 @@ const Radar = () => {
     console.log('Audio uploaded successfully');
 
     try {
-      const loaded = await fileFromAudioRef(audioRef, fileUrl, fileNameFromIndex);
+      const loaded = await fileFromReference(fileUrl, fileNameFromIndex, 'audio/mpeg');
       setCurrentFile(loaded);
 
       const {isDrone, object, confidenceLevel} = await analyzeDroneAudio(loaded);
@@ -316,34 +344,34 @@ const Radar = () => {
     resetParameters();
 
     setLoading(true);
-    // Delay
     setMessage('');
 
-    const sampleData = generateSampleSarData();
-    setSarData(sampleData);
-    setCurrentFile({ name: 'sample_sar_data.csv' });
-    setFileType('sar');
-  };
+    // Get sample data from dataset folder
+    const fileNameFromIndex = sarFileIndex + '.csv';
+    const fileUrl = '../datasets/SAR/' + fileNameFromIndex;
 
-  const generateSampleSarData = () => {
-    const data = [];
-    const numSamples = 1000;
+    // Update the index
+    setSarFileIndex(sarFileIndex >= sarFilesNumber - 1 ? 0 : sarFileIndex + 1);
 
-    for (let i = 0; i < numSamples; i++) {
-      const time = i * 0.01;
-      const baseSignal = Math.sin(time * 2 * Math.PI * 5);
-      const noise = (Math.random() - 0.5) * 0.3;
-      const targetEcho = i > 300 && i < 400 ? Math.sin(time * 2 * Math.PI * 25) * 0.5 : 0;
-      const amplitude = baseSignal + noise + targetEcho;
+    try {
+      const loaded = await fileFromReference(fileUrl, fileNameFromIndex, 'text/csv');
+      setCurrentFile(loaded);
 
-      data.push({ time, amplitude });
+      const parsedData = await parseSarFile(loaded);
+      setSarData(parsedData);
+      setFileType('sar');
+
+      const analysisResult = await analyzeSarData(loaded);
+      console.log('SAR analysis result:', analysisResult);
+      setMessage("SAR analysis completed successfully.");
+
+    } catch (error) {
+      console.error('Error loading sample SAR data:', error);
+      setMessage(`Failed to load sample SAR data: ${error.message}`);
+      setErrorHappened(true);
+    } finally {
+      setLoading(false);
     }
-
-    return {
-      type: 'sample',
-      data,
-      rawData: 'Sample SAR data for demonstration'
-    };
   };
 
   const analyzeDroneAudio = async (fileToDetect) => {
@@ -377,40 +405,36 @@ const Radar = () => {
     return await response.json();
   };
 
-  // const analyzeSarData = async () => {
-  //   if (!sarData) return;
-  //
-  //   try {
-  //     const response = await fetch('/api/sar', {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //       },
-  //       body: JSON.stringify({
-  //         sarData: sarData.data,
-  //         metadata: {
-  //           type: sarData.type,
-  //           sampleCount: sarData.data.length,
-  //           timestamp: new Date().toISOString()
-  //         }
-  //       }),
-  //     });
-  //
-  //     if (!response.ok) {
-  //       setErrorHappened(true);
-  //       throw new Error('Analysis failed');
-  //     }
-  //
-  //     const result = await response.json();
-  //     setAnalysisResult(result);
-  //   } catch (error) {
-  //     console.error('Error analyzing SAR data:', error);
-  //     setMessage('Error analyzing SAR data:' + error);
-  //     setAnalysisResult(null);
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
+  const analyzeSarData = async (fileToAnalyze) => {
+    const formData = new FormData();
+    formData.append('file', fileToAnalyze);
+
+    // Optional: Add additional parameters if needed
+    formData.append('filename', fileToAnalyze.name);
+    formData.append('filetype', fileToAnalyze.type);
+    formData.append('filesize', fileToAnalyze.size.toString());
+
+    console.log('Sending SAR file to analysis:', {
+      name: fileToAnalyze.name,
+      type: fileToAnalyze.type,
+      size: fileToAnalyze.size
+    });
+
+    // Make the API request
+    const response = await fetch('/api/sar', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      setMessage(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      setErrorHappened(true);
+    }
+
+    // Parse the JSON response
+    return await response.json();
+  };
 
   // Cleanup on component unmount
   useEffect(() => {
@@ -623,26 +647,48 @@ const Radar = () => {
                           fileType={fileType}
                           sarData={sarData}
                           audioRef={audioRef}
+                          isPlaying={isPlaying}
+                          currentTime={currentTime}
+                          onTimeUpdate={setCurrentTime}
                       />
                       <p className="text-sm text-muted-foreground">{formatTime(currentTime)} / {duration ? formatTime(parseFloat(duration)) : formatTime(0)}</p>
                     </div>
 
                     <div className="flex justify-center space-x-4">
-                      {isPlaying ? (
-                          <Button
-                              className="button btn btn-outline-danger"
-                              onClick={handlePauseAudio}
-                          >
-                            ⏸️ Pause Audio
-                          </Button>
-                      ) : (
-                          <Button
-                              className="button player-btn button-scientific"
-                              onClick={handlePlayAudio}
-                              disabled={!audioLoaded}
-                          >
-                            ▶️ Play Audio
-                          </Button>
+                      {fileType === 'audio' && (
+                          isPlaying ? (
+                              <Button
+                                  className="button btn btn-outline-danger"
+                                  onClick={handlePauseAudio}
+                              >
+                                ⏸️ Pause Audio
+                              </Button>
+                          ) : (
+                              <Button
+                                  className="button player-btn button-scientific"
+                                  onClick={handlePlayAudio}
+                                  disabled={!audioLoaded}
+                              >
+                                ▶️ Play Audio
+                              </Button>
+                          )
+                      )}
+                      {fileType === 'sar' && sarData && (
+                          isPlaying ? (
+                              <Button
+                                  className="button btn btn-outline-danger"
+                                  onClick={handlePauseAudio}
+                              >
+                                ⏸️ Pause Signal
+                              </Button>
+                          ) : (
+                              <Button
+                                  className="button player-btn button-scientific"
+                                  onClick={handlePlayAudio}
+                              >
+                                ▶️ Play Signal
+                              </Button>
+                          )
                       )}
                     </div>
                   </div>
