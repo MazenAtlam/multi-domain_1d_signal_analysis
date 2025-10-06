@@ -4,6 +4,7 @@ import Button from "../src/Components/ui/button";
 import Input from "../src/Components/ui/input";
 import Footer from "../src/Components/Footer";
 import SoundVisualizer from "../src/Components/Doppler/SoundVisualizer.jsx";
+import { isAudioFile, formatTime } from "../src/utils/AudioUtils.js";
 
 const Doppler = () => {
   // State for input fields
@@ -19,7 +20,7 @@ const Doppler = () => {
   const [currentTime, setCurrentTime] = useState(0);
   const [audioLoaded, setAudioLoaded] = useState(false);
   const [audioFileIndex, setAudioFileIndex] = useState(0);
-  const audioFilesNumber = 2;
+  const audioFilesNumber = 4;
 
   // Refs
   const audioRef = useRef(null);
@@ -45,35 +46,6 @@ const Doppler = () => {
     setAudioUrl(null);
     setAudioLoaded(false);
   }
-
-  const isAudioFile = (file) => {
-    // Check MIME type first
-    const audioMimeTypes = [
-      'audio/mpeg',
-      'audio/wav',
-      'audio/ogg',
-      'audio/aac',
-      'audio/webm',
-      'audio/flac',
-      'audio/x-m4a',
-      'audio/mp4',
-      'audio/opus'
-    ];
-
-    if (audioMimeTypes.includes(file.type)) {
-      return true;
-    }
-
-    // Fallback: Check file extension
-    const audioExtensions = [
-      '.mp3', '.wav', '.ogg', '.aac',
-      '.webm', '.flac', '.m4a', '.mp4',
-      '.wma', '.aiff', '.opus'
-    ];
-
-    const fileName = file.name.toLowerCase();
-    return audioExtensions.some(ext => fileName.endsWith(ext));
-  };
 
   // Function to get doppler car frequency and velocity
   const handleDopplerAnalysis = async (fileToDetect) => {
@@ -167,7 +139,7 @@ const Doppler = () => {
     setMessage('');
 
     // Get sample data from dataset folder
-    const fileNameFromIndex =  audioFileIndex + '.opus';
+    const fileNameFromIndex =  audioFileIndex + '.mp3';
     const fileUrl = '../datasets/doppler/' + fileNameFromIndex;
     setAudioUrl(fileUrl);
 
@@ -340,34 +312,6 @@ const Doppler = () => {
     }
   };
 
-  // Function to format time (seconds to MM:SS)
-  const formatTime = (timeInSeconds) => {
-    const minutes = Math.floor(timeInSeconds / 60);
-    const seconds = Math.floor(timeInSeconds % 60);
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  };
-
-  useEffect(() => {
-    // Focus the input when component mounts
-    if (frequencyRef.current) {
-      frequencyRef.current.focus();
-    }
-  }, []);
-
-  useEffect(() => {
-    // Focus the input when component mounts
-    if (velocityRef.current) {
-      velocityRef.current.focus();
-    }
-  }, []);
-
-  useEffect(() => {
-    // Focus the input when component mounts
-    if (durationRef.current) {
-      durationRef.current.focus();
-    }
-  }, []);
-
   // Cleanup on component unmount
   useEffect(() => {
     return () => {
@@ -452,7 +396,7 @@ const Doppler = () => {
         </div>
 
         {/* Main Content */}
-        <div className="container mx-auto px-4 py-12 flex-1">
+        <div className="container-doppler mx-auto px-0 py-12 flex-1">
           <div className="max-w-4xl mx-auto space-y-8">
             {/* Action Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -520,7 +464,7 @@ const Doppler = () => {
                 <div className="text-center space-y-4">
                   <div className="w-12 h-12 bg-signal-doppler/10 rounded-lg flex items-center justify-center mx-auto">
                     {loading ? (
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <svg className="animate-spin" width="24" height="24"  xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
