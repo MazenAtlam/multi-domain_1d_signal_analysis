@@ -1,9 +1,7 @@
 import FeatureCard from "../src/Components/EEG_ECG/FeatureCard";
 import Instructions from "../src/Components/EEG_ECG/Instructions";
-import Footer from "../src/Components/Footer.jsx"
 import SignalViewerCard from "../src/Components/EEG_ECG/SignalViewerCard";
-import TempNav from "../src/Components/EEG_ECG/TempNav";
-import ECGClassifierPanel from "../src/Components/EEG_ECG/ECGClassifierClient";
+import TempNav from "../src/Components/EEG_ECG/tempNav";
 import React, { useRef, useState, useCallback } from "react";
 import Card from "../src/Components/ui/card";
 import Button from "../src/Components/ui/button";
@@ -11,7 +9,6 @@ import "../styles/ecg.css";
 import { parseCsv } from "../src/utils/parseCsv";
 import { detectMainChannels } from "../src/utils/detectMainChannels";
 import { Activity as LucideActivity } from "lucide-react";
-
 
 function median(arr) {
   if (!arr || arr.length === 0) return 0;
@@ -90,7 +87,7 @@ function generateSyntheticECG(times, numChannels = 12) {
   return signals;
 }
 
-export default function ECG() {
+export default function EEG() {
   const fileInputRef = useRef(null);
   const leadNames = [
     "I",
@@ -125,7 +122,6 @@ export default function ECG() {
     async (e) => {
       const file = e.target.files && e.target.files[0];
       if (!file) return;
-      const sendButton = document.querySelector('.sendData');
       try {
         const parsed = await parseCsv(file);
         const parsedChannels = parsed.channels || [];
@@ -189,8 +185,6 @@ export default function ECG() {
         }
 
         if (autoPlayOnLoad) setPlaying(true);
-        // Automatically trigger send to AI model
-        if (sendButton) sendButton.click();
       } catch (err) {
         console.error("CSV parse error", err);
         alert("Failed to parse CSV: " + (err.message || err));
@@ -298,9 +292,9 @@ export default function ECG() {
           signalType="ecg"
           {...signalViewerProps}
           onClick1={() => handleModeChange("regular")}
-          onClick2={() => handleModeChange("reverse")}
-          onClick3={() => handleModeChange("polar")}
-          onClick4={() => handleModeChange("recurrence")}
+          onClick2={() => handleModeChange("polar")}
+          onClick3={() => handleModeChange("recurrence")}
+          onClick4={handleFileButtonClick}
           onClick5={loadSyntheticData}
           playButton={true}
         />
@@ -409,11 +403,10 @@ export default function ECG() {
         <Instructions
           li1={"ECG signals should be sampled at minimum 250 Hz"}
           li2={"File formats: CSV, TXT, or DAT with time-series data"}
-          // li3={"Maximum file size: 10MB per upload"}
+          li3={"Maximum file size: 10MB per upload"}
           li4={"For best results, use 12-lead ECG recordings"}
         />
       </div>
-      <Footer/>
     </>
   );
 }
