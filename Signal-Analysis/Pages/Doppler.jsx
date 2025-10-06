@@ -194,8 +194,8 @@ const Doppler = () => {
         velNum < 5 || velNum > 60 ||
         durNum < 1 || durNum > 8) {
       setMessage('- Frequency must be in range 100-800 Hz\n' +
-          '- Velocity must be in range 5-60 m/s\n' +
-          '- Duration must be in range 1-8 sec');
+                       '- Velocity must be in range 5-60 m/s\n' +
+                       '- Duration must be in range 1-8 sec');
       resetInputs();
       return;
     }
@@ -593,23 +593,23 @@ const Doppler = () => {
                     </div>
 
                     <div className="flex justify-center space-x-4">
-                      {isPlaying ? (
-                          <Button
-                              className="button btn btn-outline-danger"
-                              onClick={handlePauseAudio}
-                          >
-                            ⏸️ Pause Audio
-                          </Button>
-                      ) : (
-                          <Button
-                              className="button player-btn button-scientific"
-                              onClick={handlePlayAudio}
-                              disabled={!audioLoaded}
-                          >
-                            ▶️ Play Audio
-                          </Button>
-                      )}
-                    </div>
+                          {isPlaying ? (
+                              <Button
+                                  className="button btn btn-outline-danger"
+                                  onClick={handlePauseAudio}
+                              >
+                                ⏸️ Pause Audio
+                              </Button>
+                          ) : (
+                              <Button
+                                  className="button player-btn button-scientific"
+                                  onClick={handlePlayAudio}
+                                  disabled={!audioLoaded}
+                              >
+                                ▶️ Play Audio
+                              </Button>
+                          )}
+                        </div>
                   </div>
                 </div>
 
