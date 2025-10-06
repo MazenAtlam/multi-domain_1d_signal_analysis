@@ -480,6 +480,7 @@ import RegularMode from "../../Components/ECG/Modes/RegularMode";
 import PolarMode from "../../Components/ECG/Modes/PolarMode";
 import RecurrenceMode from "../../Components/EEG/RecurrenceMode";
 import ReverseMode from "../../Components/ECG/Modes/ReverseMode";
+import XORGraph from "../../Components/EEG/XORGraph";
 import {
   PauseFill,
   PlayFill,
@@ -511,6 +512,7 @@ export default function SignalViewerCard(props) {
     onClick3,
     onClick4,
     onClick5,
+    onClickXOR,
     fileInputRef,
   } = props;
 
@@ -554,6 +556,21 @@ export default function SignalViewerCard(props) {
       setAiResult({ error: err.message });
     } finally {
       setAiLoading(false);
+  const handleClickXOR = () => {
+    console.log("XOR Mode button clicked");
+    if (onClickXOR) {
+      onClickXOR();
+    } else {
+      console.error("onClickXOR is not defined");
+    }
+  };
+
+  const handleClick4 = () => {
+    console.log("Button 4 clicked - Choose File");
+    if (onClick4) {
+      onClick4(); // This calls handleFileButtonClick from parent
+    } else {
+      console.error("onClick4 is not defined");
     }
   };
 
@@ -687,6 +704,87 @@ export default function SignalViewerCard(props) {
           : mode === "recurrence"
           ? renderRecurrenceMode()
           : (
+  // Render XOR Mode Only
+  const renderXORMode = () => {
+    return (
+      <div className="mode-fade">
+        <h6 className="text-center text-muted mb-3">
+          XOR Pattern Visualization
+        </h6>
+        <XORGraph
+          channels={channels}
+          samplingRate={samplingRate}
+          selected={selected}
+          playing={playing}
+          speed={speed}
+          windowSec={windowSec}
+          amplitudeScale={amplitudeScale}
+          leadNames={leadNames}
+        />
+      </div>
+    );
+  };
+
+  return (
+    <>
+      <div className="border col-10 col-xl-8 mx-auto bg-light text-center py-3 rounded-4 signalViewer">
+        <IconComponent
+          className="mb-3 rounded-circle"
+          style={{
+            width: "47px",
+            height: "47px",
+            padding: "8px",
+            marginBottom: "10px",
+          }}
+        />
+        <h3>{props.title1}</h3>
+        <p style={{ color: "#656565ff" }} className="col-sm-12 col-8 mx-auto">
+          {props.describtion}
+        </p>
+        <div className="modes d-flex justify-content-center flex-wrap gap-2">
+          <div
+            className="btn bg-body-tertiary mx-3 border rounded-4"
+            onClick={handleClick1}
+          >
+            <IconComponent
+              style={{
+                width: "27px",
+                height: "27px",
+                padding: "4px",
+                marginRight: "5px",
+              }}
+            />
+            Standard Mode
+          </div>
+          <div
+            className="btn bg-body-tertiary mx-3 border rounded-4"
+            onClick={handleClick2}
+          >
+            Polar Graph
+          </div>
+          <div
+            className="btn bg-body-tertiary mx-3 border rounded-4"
+            onClick={handleClick3}
+          >
+            Recurrence Graph
+          </div>
+          <div
+            className="btn bg-body-tertiary mx-3 border rounded-4"
+            onClick={handleClickXOR}
+          >
+            XOR Graph
+          </div>
+        </div>
+        <div className="view col-12 col-xl-12 mx-auto mt-4 py-5 rounded-3">
+          {mode === "regular" ? (
+            renderRegularMode()
+          ) : mode === "polar" ? (
+            renderPolarMode()
+          ) : mode === "recurrence" ? (
+            renderRecurrenceMode()
+          ) : mode === "xor" ? (
+            renderXORMode()
+          ) : (
             <div className="text-center text-muted py-5">
               <h5>No ECG Data Loaded</h5>
               <p>Upload a file to view and analyze ECG signals.</p>

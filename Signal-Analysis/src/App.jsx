@@ -2,9 +2,11 @@ import Home from "./Home";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import EEG from "./../Pages/EEG";
 import ECG from "./../Pages/ECG";
-import Sound from "./../Pages/Sound";
+import Radar from "../Pages/Radar";
 import Doppler from "./../Pages/Doppler";
+import "../styles/index.css"
 import "../styles/doppler.css"
+import "../styles/radar.css"
 
 function App() {
   return (
@@ -14,7 +16,7 @@ function App() {
           <Route index element={<Home />} />
           <Route path="/EEG" element={<EEG />} />
           <Route path="/ECG" element={<ECG />} />
-          <Route path="/Sound" element={<Sound />} />
+          <Route path="/Radar" element={<Radar />} />
           <Route path="/Doppler" element={<Doppler />} />
           <Route path="/Home" element={<Home />} />
         </Routes>
