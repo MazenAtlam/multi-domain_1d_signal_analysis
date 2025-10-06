@@ -2,12 +2,8 @@ import "../../../styles/eeg.css";
 import RegularMode from "../../Components/ECG/Modes/RegularMode";
 import PolarMode from "../../Components/ECG/Modes/PolarMode";
 import RecurrenceMode from "../../Components/EEG/RecurrenceMode";
+import XORGraph from "../../Components/EEG/XORGraph";
 import {
-  ArrowLeft,
-  Upload,
-  Activity,
-  ExclamationCircle,
-  CheckCircleFill,
   PauseFill,
   PlayFill,
   ArrowsAngleExpand,
@@ -37,6 +33,7 @@ export default function SignalViewerCard(props) {
     onClick3,
     onClick4,
     onClick5,
+    onClickXOR,
     fileInputRef,
     onFileChange,
   } = props;
@@ -68,6 +65,15 @@ export default function SignalViewerCard(props) {
       onClick3();
     } else {
       console.error("onClick3 is not defined");
+    }
+  };
+
+  const handleClickXOR = () => {
+    console.log("XOR Mode button clicked");
+    if (onClickXOR) {
+      onClickXOR();
+    } else {
+      console.error("onClickXOR is not defined");
     }
   };
 
@@ -279,13 +285,32 @@ export default function SignalViewerCard(props) {
     );
   };
 
+  // Render XOR Mode Only
+  const renderXORMode = () => {
+    return (
+      <div className="mode-fade">
+        <h6 className="text-center text-muted mb-3">
+          XOR Pattern Visualization
+        </h6>
+        <XORGraph
+          channels={channels}
+          samplingRate={samplingRate}
+          selected={selected}
+          playing={playing}
+          speed={speed}
+          windowSec={windowSec}
+          amplitudeScale={amplitudeScale}
+          leadNames={leadNames}
+        />
+      </div>
+    );
+  };
+
   return (
     <>
       <div className="border col-10 col-xl-8 mx-auto bg-light text-center py-3 rounded-4 signalViewer">
         <IconComponent
-          className={`mb-3 rounded-circle ${
-            props.icon.render?.displayName || ""
-          }`}
+          className="mb-3 rounded-circle"
           style={{
             width: "47px",
             height: "47px",
@@ -324,6 +349,12 @@ export default function SignalViewerCard(props) {
           >
             Recurrence Graph
           </div>
+          <div
+            className="btn bg-body-tertiary mx-3 border rounded-4"
+            onClick={handleClickXOR}
+          >
+            XOR Graph
+          </div>
         </div>
         <div className="view col-12 col-xl-12 mx-auto mt-4 py-5 rounded-3">
           {mode === "regular" ? (
@@ -332,6 +363,8 @@ export default function SignalViewerCard(props) {
             renderPolarMode()
           ) : mode === "recurrence" ? (
             renderRecurrenceMode()
+          ) : mode === "xor" ? (
+            renderXORMode()
           ) : (
             <div className="text-center text-muted py-5">
               <IconComponent
