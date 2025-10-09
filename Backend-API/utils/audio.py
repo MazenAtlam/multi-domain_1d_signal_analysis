@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from scipy.io import wavfile
 from scipy.signal import stft, find_peaks
 import warnings
+import librosa
 warnings.filterwarnings('ignore')
 
 
@@ -57,8 +58,14 @@ class DopplerVelocityDetector:
         filepath : str
             Path to WAV audio file
         """
-        self.fs, audio_data = wavfile.read(filepath)
-        
+        audio_data = None
+        if filepath.endswith('.wav'):
+            self.fs, audio_data = wavfile.read(filepath)
+        elif filepath.endswith('.mp3'):
+            audio_data, self.fs = librosa.load(filepath, sr=None)
+        else:
+            raise NotImplementedError('Audio file type not supported. Only .wav and .mp3 are supported.')
+
         # Convert to mono if stereo
         if len(audio_data.shape) > 1:
             self.audio = audio_data.mean(axis=1)

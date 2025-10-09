@@ -430,7 +430,7 @@ export default function SignalViewerCard(props) {
               onChange={onFileChange}
               ref={fileInputRef}
               style={{ display: "none" }}
-              accept=".csv,.txt,.edf,.dat, .set"
+              accept=".csv,.txt,.edf,.dat,.set"
             />
             <button
               className="btn p-2 rounded-3 mx-5 file"

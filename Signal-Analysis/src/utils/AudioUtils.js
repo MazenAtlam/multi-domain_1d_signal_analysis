@@ -3,13 +3,6 @@ const isAudioFile = (file) => {
     const audioMimeTypes = [
         'audio/mpeg',
         'audio/wav',
-        'audio/ogg',
-        'audio/aac',
-        'audio/webm',
-        'audio/flac',
-        'audio/x-m4a',
-        'audio/mp4',
-        'audio/opus'
     ];
 
     if (audioMimeTypes.includes(file.type)) {
@@ -18,9 +11,7 @@ const isAudioFile = (file) => {
 
     // Fallback: Check file extension
     const audioExtensions = [
-        '.mp3', '.wav', '.ogg', '.aac',
-        '.webm', '.flac', '.m4a', '.mp4',
-        '.wma', '.aiff', '.opus'
+        '.mp3', '.wav'
     ];
 
     const fileName = file.name.toLowerCase();

@@ -26,7 +26,7 @@ const Radar = () => {
   const [audioFileIndex, setAudioFileIndex] = useState(0);
   const [sarFileIndex, setSarFileIndex] = useState(0);
   const audioFilesNumber = 5;
-  const sarFilesNumber = 5;
+  const sarFilesNumber = 0;
   const [message, setMessage] = useState('');
   const [errorHappened, setErrorHappened] = useState(false);
 
@@ -397,7 +397,8 @@ const Radar = () => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      setMessage(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      setMessage(`Failed to fetch! status: ${response.status}`);
+      console.error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       setErrorHappened(true);
     }
 
@@ -428,7 +429,8 @@ const Radar = () => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      setMessage(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      setMessage(`Failed to fetch! status: ${response.status}`);
+      console.error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       setErrorHappened(true);
     }
 
@@ -463,34 +465,49 @@ const Radar = () => {
 
   return (
       <div className="radar-container">
-        <div className="radar-header">
-          <div className="header-content">
-            <div className="header-left">
-              <a href="/">
-                <Button className="back-button">
-                  <svg className="arrow-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="m12 19-7-7 7-7"></path>
-                    <path d="M19 12H5"></path>
-                  </svg>
-                  Back to Home
-                </Button>
-              </a>
-              <div className="header-title">
-                <div className="icon-container radar-icon">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M19.07 4.93A10 10 0 0 0 6.99 3.34"></path>
-                    <path d="M4 6h.01"></path>
-                    <path d="M2.29 9.62A10 10 0 1 0 21.31 8.35"></path>
-                    <path d="M16.24 7.76A6 6 0 1 0 8.23 16.67"></path>
-                    <path d="M12 18h.01"></path>
-                    <path d="M17.99 11.66A6 6 0 0 1 15.77 16.67"></path>
-                    <circle cx="12" cy="12" r="2"></circle>
-                    <path d="m13.41 10.59 5.66-5.66"></path>
-                  </svg>
-                </div>
-                <div>
-                  <h1>Radar Detection</h1>
-                  <p>Drone & SAR Signal Processing</p>
+        <div className="bg-card/50 border-b border-border">
+          <div className="container px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <a href="/">
+                  <Button className="button-scientific bg-background border-input rounded-md">
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="w-4 h-4 mr-2"
+                    >
+                      <path d="m12 19-7-7 7-7"></path>
+                      <path d="M19 12H5"></path>
+                    </svg>
+                    Back to Home
+                  </Button>
+                </a>
+
+                <div className="flex items-center space-x-3 justify-between">
+                  <div className="w-10 h-10 radar-icon rounded-lg flex items-center justify-center">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M19.07 4.93A10 10 0 0 0 6.99 3.34"></path>
+                      <path d="M4 6h.01"></path>
+                      <path d="M2.29 9.62A10 10 0 1 0 21.31 8.35"></path>
+                      <path d="M16.24 7.76A6 6 0 1 0 8.23 16.67"></path>
+                      <path d="M12 18h.01"></path>
+                      <path d="M17.99 11.66A6 6 0 0 1 15.77 16.67"></path>
+                      <circle cx="12" cy="12" r="2"></circle>
+                      <path d="m13.41 10.59 5.66-5.66"></path>
+                    </svg>
+                  </div>
+
+                  <div className="ms-3">
+                    <h1 className="text-2xl font-bold text-foreground">Radar Detection</h1>
+                    <p className="text-muted-foreground">Drone & SAR Signal Processing</p>
+                  </div>
                 </div>
               </div>
             </div>
