@@ -309,7 +309,7 @@ const Radar = () => {
 
     // Get sample data from dataset folder
     const fileNameFromIndex =  audioFileIndex + '.mp3';
-    const fileUrl = '../datasets/drone/' + fileNameFromIndex;
+    const fileUrl = '../testing_data/drone/' + fileNameFromIndex;
     setAudioUrl(fileUrl);
 
     // Update the index
@@ -348,7 +348,7 @@ const Radar = () => {
 
     // Get sample data from dataset folder
     const fileNameFromIndex = sarFileIndex + '.csv';
-    const fileUrl = '../datasets/SAR/' + fileNameFromIndex;
+    const fileUrl = '../testing_data/SAR/' + fileNameFromIndex;
 
     // Update the index
     setSarFileIndex(sarFileIndex >= sarFilesNumber - 1 ? 0 : sarFileIndex + 1);

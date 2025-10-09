@@ -18,6 +18,7 @@ export default function SignalViewerCard(props) {
     selected,
     playing,
     speed,
+    loading,
     windowSec,
     amplitudeScale,
     setPlaying,
@@ -308,7 +309,7 @@ export default function SignalViewerCard(props) {
 
   return (
     <>
-      <div className="border col-10 col-xl-8 mx-auto bg-light text-center py-3 rounded-4 signalViewer">
+      <div className="border col-10 col-xl-8 mx-auto mb-3 bg-light text-center p-6 rounded-4 signalViewer">
         <IconComponent
           className="mb-3 rounded-circle"
           style={{
@@ -387,12 +388,14 @@ export default function SignalViewerCard(props) {
                 <button
                   className="btn btn-sm btn-outline-secondary mx-2"
                   onClick={zoomIn}
+                  disabled={loading}
                 >
                   <ArrowsAngleContract />
                 </button>
                 <button
                   className="btn btn-sm btn-outline-secondary mx-2"
                   onClick={zoomOut}
+                  disabled={loading}
                 >
                   <ArrowsAngleExpand />
                 </button>
@@ -404,12 +407,14 @@ export default function SignalViewerCard(props) {
                 <button
                   className="btn btn-sm btn-outline-secondary ms-3 mx-2"
                   onClick={ampMinus}
+                  disabled={loading}
                 >
                   -amp
                 </button>
                 <button
                   className="btn btn-sm btn-outline-secondary mx-2"
                   onClick={ampPlus}
+                  disabled={loading}
                 >
                   +amp
                 </button>
@@ -425,11 +430,12 @@ export default function SignalViewerCard(props) {
               onChange={onFileChange}
               ref={fileInputRef}
               style={{ display: "none" }}
-              accept=".csv,.txt,.edf,.dat"
+              accept=".csv,.txt,.edf,.dat, .set"
             />
             <button
               className="btn p-2 rounded-3 mx-5 file"
               onClick={handleClick4}
+              disabled={loading}
             >
               Choose file
             </button>
@@ -437,22 +443,18 @@ export default function SignalViewerCard(props) {
             <button
               className="btn p-2 rounded-3 mx-5 bg-body-tertiary fs-6 activity"
               onClick={handleClick5}
+              disabled={loading}
             >
               Load some data
             </button>
           </div>
 
-          <button
-            className="btn sendData"
-            style={{ backgroundColor: "#EE2B2B" }}
-          >
-            Send to AI model for Analysis
-          </button>
           {props.playButton && (
             <button
               className="btn sendData mx-3"
               style={{ backgroundColor: "#EE2B2B" }}
-              onClick={() => setPlaying((p) => !p)}
+              onClick={() => setPlaying(!playing)}
+              disabled={loading}
             >
               {playing ? (
                 <>
