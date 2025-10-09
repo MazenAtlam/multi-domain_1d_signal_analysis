@@ -7,10 +7,10 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://fleshier-alvin-appealingly.ngrok-free.dev',
+        target: 'http://localhost:5001',
         changeOrigin: true
       }
     },
-    port: 5001
+    port: 5002
   }
 })

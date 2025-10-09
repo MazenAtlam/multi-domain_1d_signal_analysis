@@ -40,42 +40,6 @@ const eegLeadNames = [
   "Pz",
 ];
 
-function generateSyntheticEEG(times, numChannels = 19) {
-  const signals = [];
-
-  for (let ch = 0; ch < numChannels; ch++) {
-    const signal = times.map((t) => {
-      // Generate EEG-like signals with different frequency components
-      let value = 0;
-
-      // Alpha waves (8-13 Hz)
-      value += 0.3 * Math.sin(2 * Math.PI * 10 * t + ch * 0.1);
-
-      // Beta waves (13-30 Hz)
-      value += 0.2 * Math.sin(2 * Math.PI * 20 * t + ch * 0.2);
-
-      // Theta waves (4-7 Hz)
-      value += 0.15 * Math.sin(2 * Math.PI * 6 * t + ch * 0.05);
-
-      // Delta waves (0.5-4 Hz)
-      value += 0.1 * Math.sin(2 * Math.PI * 2 * t + ch * 0.15);
-
-      // Add some random noise (EEG artifacts)
-      value += 0.05 * (Math.random() - 0.5);
-
-      // Scale based on channel position (frontal channels typically have higher amplitude)
-      if (ch < 2) value *= 1.5; // Fp1, Fp2
-      else if (ch < 6) value *= 1.2; // F3, F4, C3, C4
-
-      return value;
-    });
-
-    signals.push(signal);
-  }
-
-  return signals;
-}
-
 // EEG-specific analysis functions
 function analyzeEEGChannel(channel, sr) {
   if (!channel || channel.length < Math.min(200, sr * 2)) return null;
@@ -119,12 +83,6 @@ function analyzeEEGChannel(channel, sr) {
     betaPower: totalPower > 0 ? (betaPower / totalPower) * 100 : 0,
   };
 }
-
-// API Configuration
-const API_BASE_URL = "https://fleshier-alvin-appealingly.ngrok-free.dev";
-const API_ENDPOINTS = {
-  EEG_CLASSIFY: `${API_BASE_URL}/eeg/classify`,
-};
 
 // Helper function to format API response for consistent display
 const formatApiResponse = (apiResponse) => {
@@ -640,7 +598,6 @@ export default function EEG() {
   const [autoPlayOnLoad, setAutoPlayOnLoad] = useState(true);
 
   // Classification states
-  const [classificationFile, setClassificationFile] = useState(null);
   const [log, setLog] = useState([]);
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -655,20 +612,7 @@ export default function EEG() {
     }
   }, [log]);
 
-  // Real API classification
-  const handleClassificationSubmit = async (e) => {
-    e.preventDefault();
-    if (!classificationFile) return;
-
-    setError(null);
-    setLog([]);
-    setResults(null);
-    setLoading(true);
-    setIsMockData(false);
-
-    const formData = new FormData();
-    formData.append("file", classificationFile);
-
+  const handleSendToAI = async (data) => {
     try {
       setLog([
         "Starting EEG classification...",
@@ -676,7 +620,7 @@ export default function EEG() {
         "Processing EEG data...",
       ]);
 
-      const response = await axios.post(API_ENDPOINTS.EEG_CLASSIFY, formData, {
+      const response = await axios.post('/api/eeg/classify', data, {
         headers: {
           "Content-Type": "multipart/form-data",
           Accept: "application/json",
@@ -685,7 +629,7 @@ export default function EEG() {
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {
             const percentCompleted = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
+                (progressEvent.loaded * 100) / progressEvent.total
             );
             setLog((prev) => [
               ...prev,
@@ -715,18 +659,18 @@ export default function EEG() {
 
       if (err.response) {
         errorMessage = `Server error: ${err.response.status} - ${
-          err.response.data?.message ||
-          err.response.data?.error ||
-          "Unknown error"
+            err.response.data?.message ||
+            err.response.data?.error ||
+            "Unknown error"
         }`;
         setLog((prev) => [...prev, `Server error: ${err.response.status}`]);
       } else if (err.request) {
         errorMessage =
-          "No response from server. Please check your connection and try again.";
+            "No response from server. Please check your connection and try again.";
         setLog((prev) => [...prev, "Error: No response from server"]);
       } else if (err.code === "ECONNABORTED") {
         errorMessage =
-          "Request timeout. The server is taking too long to respond.";
+            "Request timeout. The server is taking too long to respond.";
         setLog((prev) => [...prev, "Error: Request timeout"]);
       } else {
         errorMessage = err.message || "An unexpected error occurred";
@@ -737,65 +681,38 @@ export default function EEG() {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  // Mock classification
-  const handleMockClassification = async () => {
+  // Real API classification
+  const handleClassificationSubmit = async (file) => {
+    // e.preventDefault();
+    if (!file) return;
+
     setError(null);
     setLog([]);
     setResults(null);
     setLoading(true);
-    setIsMockData(true);
 
-    const mockSteps = [
-      "Starting MOCK classification...",
-      "Loading EEG file...",
-      "Validating file format...",
-      "Preprocessing signals...",
-      "Applying filters...",
-      "Extracting features...",
-      "Running AI model...",
-      "Analyzing results...",
-      "Classification complete!",
-    ];
+    const formData = new FormData();
+    formData.append("file", file);
 
-    try {
-      for (let i = 0; i < mockSteps.length; i++) {
-        setLog((prev) => [...prev, mockSteps[i]]);
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      }
-
-      const isAlzheimers = Math.random() > 0.7;
-      const confidence = Math.random() * 20 + 75;
-
-      const mockResults = {
-        data: {
-          subject: isAlzheimers ? 1 : 0,
-          confidence: confidence,
-          avg_healthy: isAlzheimers
-            ? (1 - confidence / 100) * 0.8
-            : confidence / 100,
-          avg_ad: isAlzheimers
-            ? confidence / 100
-            : (1 - confidence / 100) * 0.8,
-          message: "Mock classification results for demonstration",
-        },
-      };
-
-      setResults(mockResults);
-    } catch (err) {
-      setError("Mock classification failed: " + err.message);
-    } finally {
-      setLoading(false);
-    }
+    await handleSendToAI(formData);
   };
 
-  const handleFileButtonClick = () => fileInputRef.current?.click();
+  const handleFileButtonClick = () => {
+    fileInputRef.current?.click();
+    setIsMockData(false);
+  }
 
   const onFileChange = useCallback(
-    async (e) => {
-      const file = e.target.files && e.target.files[0];
-      if (!file) return;
+    async () => {
+      console.log(fileInputRef.current);
+      if (!fileInputRef?.current) return;
+
+      const file = fileInputRef.current.files[0];
+      console.log(file);
+      handleClassificationSubmit(file);
+
       try {
         const parsed = await parseCsv(file);
         const parsedChannels = parsed.channels || [];
@@ -859,12 +776,12 @@ export default function EEG() {
         );
         setSelected(defaultSelected);
 
-        if (autoPlayOnLoad) setPlaying(true);
+        setPlaying(true);
       } catch (err) {
         console.error("CSV parse error", err);
         alert("Failed to parse CSV: " + (err.message || err));
       } finally {
-        e.target.value = "";
+        fileInputRef.current.value = "";
       }
     },
     [samplingRate, autoPlayOnLoad]
@@ -887,27 +804,33 @@ export default function EEG() {
     setPlaying(false);
   };
 
-  const loadSyntheticData = () => {
-    const samplingRate = 250;
-    const t = Array.from(
-      { length: 30 * samplingRate },
-      (_, i) => i / samplingRate
-    );
-    const signals = generateSyntheticEEG(t, 19);
-    setChannels(signals);
-    setSamplingRate(samplingRate);
-    setSelected(
-      Array.from({ length: Math.min(6, signals.length) }, (_, i) => i)
-    );
+  const fileFromUrl = async (fileInputSrc, filename) => {
+    if (!fileInputSrc) return null;
+    const response = await fetch(fileInputSrc);
+    const data = await response.blob();
+    return new File([data], filename, { type: data.type });
+  };
 
-    // Analyze synthetic data
-    const analysis = {};
-    for (let i = 0; i < Math.min(3, signals.length); i++) {
-      analysis[eegLeadNames[i]] = analyzeEEGChannel(signals[i], samplingRate);
+  const loadSyntheticData = async () => {
+    const filename = "synthetic_eeg_data.set";
+    const filePath = "../testing_data/EEG/" + filename;
+
+    const fileLoaded = await fileFromUrl(filePath, filename);
+
+    if (!fileInputRef?.current || !fileLoaded) {
+      console.error("Error loading file: " + filename);
+      alert("Error loading file: " + filename);
     }
-    setChannelAnalysis(analysis);
 
-    setPlaying(true);
+    // Create a DataTransfer to simulate file selection
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(fileLoaded);
+
+    // Set the files on the input
+    fileInputRef.current.files = dataTransfer.files;
+
+    setIsMockData(true);
+    await onFileChange();
   };
 
   const clearData = () => {
@@ -917,7 +840,6 @@ export default function EEG() {
     setPlaying(false);
     setResults(null);
     setLog([]);
-    setClassificationFile(null);
     setError(null);
     setIsMockData(false);
   };
@@ -941,6 +863,7 @@ export default function EEG() {
     zoomOut,
     ampPlus,
     ampMinus,
+    loading,
     setSpeed,
     setSelected,
     autoPlayOnLoad,
@@ -997,115 +920,9 @@ export default function EEG() {
         describtion="Electroencephalogram Signal Processing & Classification"
       />
       <div className="page bg-body-tertiary py-5">
+
         {/* Signal Viewer Section */}
-        <Card className="p-3 mb-3 col-10 col-xl-8 mx-auto">
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <div>
-              <h6 className="mb-1">EEG Signal Visualization</h6>
-              <p className="text-muted small mb-0">
-                {mode === "regular" && "Standard time-domain visualization"}
-                {mode === "polar" && "Polar coordinate visualization"}
-                {mode === "recurrence" && "Recurrence plot analysis"}
-                {mode === "xor" &&
-                  "XOR pattern visualization - Similar signals cancel out"}
-              </p>
-            </div>
-            <div className="d-flex gap-2">
-              <button
-                className={`btn btn-sm ${
-                  mode === "regular" ? "btn-primary" : "btn-outline-primary"
-                }`}
-                onClick={() => handleModeChange("regular")}
-              >
-                Regular
-              </button>
-              <button
-                className={`btn btn-sm ${
-                  mode === "polar" ? "btn-primary" : "btn-outline-primary"
-                }`}
-                onClick={() => handleModeChange("polar")}
-              >
-                Polar
-              </button>
-              <button
-                className={`btn btn-sm ${
-                  mode === "recurrence" ? "btn-primary" : "btn-outline-primary"
-                }`}
-                onClick={() => handleModeChange("recurrence")}
-              >
-                Recurrence
-              </button>
-              <button
-                className={`btn btn-sm ${
-                  mode === "xor" ? "btn-primary" : "btn-outline-primary"
-                }`}
-                onClick={() => handleModeChange("xor")}
-              >
-                XOR Graph
-              </button>
-            </div>
-          </div>
-
-          {renderGraph()}
-
-          <div className="mt-3 d-flex justify-content-between align-items-center">
-            <div className="d-flex gap-2">
-              <button
-                className="btn btn-outline-secondary btn-sm"
-                onClick={handleFileButtonClick}
-              >
-                Load CSV
-              </button>
-              <button
-                className="btn btn-outline-info btn-sm"
-                onClick={loadSyntheticData}
-              >
-                Synthetic Data
-              </button>
-              <button
-                className="btn btn-outline-warning btn-sm"
-                onClick={clearData}
-              >
-                Clear
-              </button>
-            </div>
-
-            <div className="d-flex gap-2 align-items-center">
-              <span className="small text-muted">Speed:</span>
-              <select
-                className="form-select form-select-sm"
-                style={{ width: "80px" }}
-                value={speed}
-                onChange={(e) => setSpeed(Number(e.target.value))}
-              >
-                <option value={0.5}>0.5x</option>
-                <option value={1}>1x</option>
-                <option value={2}>2x</option>
-                <option value={5}>5x</option>
-              </select>
-
-              <button
-                className={`btn btn-sm ${
-                  playing ? "btn-warning" : "btn-success"
-                }`}
-                onClick={() => setPlaying(!playing)}
-              >
-                {playing ? "Pause" : "Play"}
-              </button>
-            </div>
-          </div>
-        </Card>
-
-        {/* EEG Classification Section */}
-        <Card className="p-3 mb-3 col-10 col-xl-6 mx-auto">
-          <h6>EEG Alzheimer's Classification</h6>
-          <p className="text-muted small mb-3">
-            Upload EEG files for Alzheimer's disease classification using AI
-            <br />
-            <small className="text-success">Connected to: {API_BASE_URL}</small>
-          </p>
-
-          {error && (
+        {error && (
             <div className="alert alert-warning small" role="alert">
               <strong>Notice:</strong> {error}
               <br />
@@ -1113,74 +930,36 @@ export default function EEG() {
                 You can try the mock classification below for testing.
               </small>
             </div>
-          )}
+        )}
 
-          <form onSubmit={handleClassificationSubmit}>
-            <div className="mb-3">
-              <input
-                type="file"
-                accept=".set,.edf,.fif,.csv,.txt,.mat"
-                onChange={(e) => setClassificationFile(e.target.files[0])}
-                className="form-control"
-                disabled={loading}
-              />
-              <small className="text-muted">
-                Supported formats: .set, .edf, .fif, .csv, .txt, .mat
-              </small>
-            </div>
+        {renderGraph()}
 
-            <div className="d-flex gap-2 flex-wrap">
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={!classificationFile || loading}
-              >
-                {loading ? (
-                  <>
-                    <span
-                      className="spinner-border spinner-border-sm me-2"
-                      role="status"
-                    ></span>
-                    Processing...
-                  </>
-                ) : (
-                  "Upload & Classify (Real API)"
-                )}
-              </button>
+        {/* EEG Classification Section */}
+        {results && (
+          <Card className="p-3 mb-3 col-10 col-xl-6 mx-auto">
+            {log.length > 0 && (
+                <div className="mt-4">
+                  <h6>Classification Pipeline Output</h6>
+                  <div
+                      ref={logRef}
+                      className="terminal p-3 bg-dark text-light rounded small"
+                      style={{
+                        height: "200px",
+                        overflowY: "auto",
+                        fontFamily: "monospace",
+                        whiteSpace: "pre-wrap",
+                        fontSize: "0.8rem",
+                      }}
+                  >
+                    {log.join("\n")}
+                  </div>
+                </div>
+            )}
 
-              <button
-                type="button"
-                className="btn btn-outline-secondary"
-                onClick={handleMockClassification}
-                disabled={loading}
-              >
-                Try Mock Classification
-              </button>
-            </div>
-          </form>
-
-          {log.length > 0 && (
-            <div className="mt-4">
-              <h6>Classification Pipeline Output</h6>
-              <div
-                ref={logRef}
-                className="terminal p-3 bg-dark text-light rounded small"
-                style={{
-                  height: "200px",
-                  overflowY: "auto",
-                  fontFamily: "monospace",
-                  whiteSpace: "pre-wrap",
-                  fontSize: "0.8rem",
-                }}
-              >
-                {log.join("\n")}
-              </div>
-            </div>
-          )}
-
-          {/* Results Display */}
-          {results && <ResultsDisplay results={results} isMock={isMockData} />}
-        </Card>
+            {/* Results Display */}
+            {results && <ResultsDisplay results={results} isMock={isMockData} />}
+          </Card>
+        )}
 
         <Card className="p-3 mb-3 col-10 col-xl-6 mx-auto">
           <h6>EEG Channels</h6>

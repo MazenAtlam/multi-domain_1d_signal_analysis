@@ -140,7 +140,7 @@ const Doppler = () => {
 
     // Get sample data from dataset folder
     const fileNameFromIndex =  audioFileIndex + '.mp3';
-    const fileUrl = '../datasets/doppler/' + fileNameFromIndex;
+    const fileUrl = '../testing_data/doppler/' + fileNameFromIndex;
     setAudioUrl(fileUrl);
 
     // Update the index
@@ -715,11 +715,11 @@ const Doppler = () => {
                 <div className="ms-3">
                   <h3>Usage Guidelines</h3>
                   <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>• Audio signals should be sampled at minimum 44.1 kHz</li>
-                    <li>• For generation: Enter source frequency (100-800 Hz) and velocity (5 to 60 m/s)</li>
-                    <li>• For analysis: Upload clear audio with minimal background noise</li>
-                    <li>• Maximum file size: 25MB per upload</li>
-                    <li>• Best results with mono audio recordings</li>
+                    <li>Audio signals should be sampled at minimum 44.1 kHz</li>
+                    <li>For generation: Enter source frequency (100-800 Hz) and velocity (5 to 60 m/s)</li>
+                    <li>For analysis: Upload clear audio with minimal background noise</li>
+                    <li>Maximum file size: 25MB per upload</li>
+                    <li>Best results with mono audio recordings</li>
                   </ul>
                 </div>
               </div>
