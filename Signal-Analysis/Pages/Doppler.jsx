@@ -1,16 +1,17 @@
-import { useState, useRef, useEffect } from "react";
+import {useEffect, useRef, useState} from "react";
 import Card from "../src/Components/ui/card";
 import Button from "../src/Components/ui/button";
 import Input from "../src/Components/ui/input";
 import Footer from "../src/Components/Footer";
 import SoundVisualizer from "../src/Components/Doppler/SoundVisualizer.jsx";
-import { isAudioFile, formatTime } from "../src/utils/AudioUtils.js";
+import {formatTime, isAudioFile} from "../src/utils/AudioUtils.js";
 
 const Doppler = () => {
   // State for input fields
   const [frequency, setFrequency] = useState('');
   const [velocity, setVelocity] = useState('');
   const [duration, setDuration] = useState('');
+  const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -32,15 +33,16 @@ const Doppler = () => {
   const [selectedFile, setSelectedFile] = useState(null);
 
   const resetInputs = () => {
-    setFrequency('');
     frequencyRef.current.value = '';
-    setVelocity('');
     velocityRef.current.value = '';
-    setDuration('');
     durationRef.current.value = '';
+    setFrequency('');
+    setVelocity('');
+    setDuration('');
   }
 
   const resetParameters = () => {
+    setDetails(null);
     setSelectedFile(null);
     setCurrentTime(0);
     setAudioUrl(null);
@@ -51,38 +53,19 @@ const Doppler = () => {
   const handleDopplerAnalysis = async (fileToDetect) => {
     // Create FormData object
     const formData = new FormData();
-    formData.append('audio', fileToDetect);
-
-    // Optional: Add additional parameters if needed
-    formData.append('filename', fileToDetect.name);
-    formData.append('filetype', fileToDetect.type);
-    formData.append('filesize', fileToDetect.size.toString());
-
-    console.log('Sending audio file to doppler detection:', {
-      name: fileToDetect.name,
-      type: fileToDetect.type,
-      size: fileToDetect.size
-    });
+    formData.append('file', fileToDetect);
 
     // Make the API request
-    const response = await fetch('/api/doppler/analysis', {
+    return await fetch('/api/doppler/analysis', {
       method: 'POST',
       body: formData
     });
-
-    // Check if the request was successful
-    if (!response.ok) {
-      const errorText = await response.text();
-      setMessage(`HTTP error! status: ${response.status}, message: ${errorText}`);
-    }
-
-    // Parse the JSON response
-    return await response.json();
   };
 
   // Function to handle choosing file
   const handleChooseFile = async (e) => {
     resetParameters();
+    resetInputs();
 
     const fileSelected = e.target.files[0];
     e.target.value = '';
@@ -92,7 +75,7 @@ const Doppler = () => {
 
     if (fileSelected === undefined || !isAudioFile(fileSelected))
     {
-      setMessage('The signal should be an audio file.')
+      setMessage('The signal should be an audio file. Only .wav and .mp3 are supported.')
       return;
     }
 
@@ -105,11 +88,21 @@ const Doppler = () => {
 
     // Analyze doppler parameters: frequency and velocity
     try {
-      const {frequency, velocity} = await handleDopplerAnalysis(fileSelected);
-      setFrequency(frequency);
-      setVelocity(velocity);
+      const response = await handleDopplerAnalysis(fileSelected);
 
-      console.log(`Doppler detection results: {frequency: ${frequency}, velocity: ${velocity}}`);
+      // Check if the request was successful
+      if (!response.ok) {
+        const errorText = await response.text();
+        setMessage(`Failed to fetch! status: ${response.status}`);
+        console.error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+        return;
+      }
+
+      // Parse the JSON response
+      const {details} = await response.json();
+      setDetails(details);
+
+      console.log(`Doppler detection results: {frequency: '${details.frequency_min}-${details.frequency_max} Hz', velocity: '${details.velocity_min_ms}-${details.velocity_max_ms} m/s'`);
       setMessage("Analysis completed successfully.");
 
     } catch (error) {
@@ -122,8 +115,6 @@ const Doppler = () => {
   };
 
   const fileFromAudioRef = async (audioReference, audioSrc, filename) => {
-    console.log(audioReference.current);
-    console.log(audioSrc);
     if (!audioReference.current || !audioSrc) return null;
     const response = await fetch(audioSrc);
     const data = await response.blob();
@@ -133,6 +124,7 @@ const Doppler = () => {
   // Function to handle the load some data
   const handleLoadSomeData = async () => {
     resetParameters();
+    resetInputs();
 
     setLoading(true);
     // Delay
@@ -152,11 +144,21 @@ const Doppler = () => {
     try {
       const loaded = await fileFromAudioRef(audioRef, fileUrl, fileNameFromIndex);
       setSelectedFile(loaded);
-      const {frequency_2, velocity_2} = await handleDopplerAnalysis(loaded);
-      setFrequency(frequency_2);
-      setVelocity(velocity_2);
+      const response = await handleDopplerAnalysis(loaded);
 
-      console.log(`Doppler detection results: {frequency: ${frequency_2}, velocity: ${velocity_2}}`);
+      // Check if the request was successful
+      if (!response.ok) {
+        const errorText = await response.text();
+        setMessage(`Failed to fetch! status: ${response.status}`);
+        console.error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+        return;
+      }
+
+      // Parse the JSON response
+      const {details} = await response.json();
+      setDetails(details);
+
+      console.log(`Doppler detection results: {frequency: '${details.frequency_min.toPrecision(3)}-${details.frequency_max.toPrecision(3)} Hz', velocity: '${details.velocity_min_ms.toPrecision(3)}-${details.velocity_max_ms.toPrecision(3)} m/s'`);
       setMessage("Analysis completed successfully.");
 
     } catch (error) {
@@ -227,7 +229,9 @@ const Doppler = () => {
       console.log('Doppler detection results:', response);
       // Check if the request was successful
       if (!response.ok) {
+        const errorText = await response.text();
         setMessage(`Failed to fetch! status: ${response.status}`);
+        console.error(`HTTP error! status: ${response.status}, message: ${errorText}`);
         resetInputs();
         return;
       }
@@ -513,7 +517,7 @@ const Doppler = () => {
                       <div className="space-y-3">
                         <Input
                             type="file"
-                            accept="audio/*"
+                            accept=".wav,.mp3"
                             className="input-file"
                             onChange={handleChooseFile}
                         />
@@ -624,8 +628,23 @@ const Doppler = () => {
                   <Card>
                     <div className="text-center space-y-3">
                       <h3>Velocity</h3>
-                      <div className="text-3xl font-bold text-signal-doppler">{velocity || '0'} m/s</div>
-                      <p className="text-sm text-muted-foreground">({(parseFloat(velocity) * 3.6) || '0'} km/h)</p>
+                      {details ? (
+                          <>
+                            <div className="text-3xl font-bold text-signal-doppler">{details.velocity_min_ms.toPrecision(3) === details.velocity_max_ms.toPrecision(3)
+                                ? details.velocity_min_ms.toPrecision(3)
+                                : details.velocity_min_ms.toPrecision(3) + ' - ' + details.velocity_max_ms.toPrecision(3)} m/s
+                            </div>
+                            <p className="text-sm text-muted-foreground">({details.velocity_min_kmh.toPrecision(3) === details.velocity_max_kmh.toPrecision(3)
+                                ? details.velocity_min_kmh.toPrecision(3)
+                                : details.velocity_min_kmh.toPrecision(3) + ' - ' + details.velocity_max_kmh.toPrecision(3)} km/h)
+                            </p>
+                          </>
+                      ) : (
+                          <>
+                            <div className="text-3xl font-bold text-signal-doppler">{velocity || '0'} m/s</div>
+                            <p className="text-sm text-muted-foreground">({velocity ? (parseFloat(velocity) * 3.6).toPrecision(3) : '0'} km/h)</p>
+                          </>
+                      )}
                       <p className="text-sm text-muted-foreground">Calculated velocity</p>
                     </div>
                   </Card>
@@ -633,7 +652,14 @@ const Doppler = () => {
                   <Card>
                     <div className="text-center space-y-3">
                       <h3>Frequency</h3>
-                      <div className="text-3xl font-bold text-signal-doppler">{frequency || '0'} Hz</div>
+                      {details ? (
+                          <div className="text-3xl font-bold text-signal-doppler">{details.frequency_min.toPrecision(3) === details.frequency_max.toPrecision(3)
+                              ? details.frequency_min.toPrecision(3)
+                              : details.frequency_min.toPrecision(3) + ' - ' + details.frequency_max.toPrecision(3)} Hz
+                          </div>
+                      ) : (
+                          <div className="text-3xl font-bold text-signal-doppler">{frequency ? parseFloat(frequency).toPrecision(3) : '0'} Hz</div>
+                      )}
                       <p className="text-sm text-muted-foreground">Source frequency</p>
                     </div>
                   </Card>

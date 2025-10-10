@@ -1,5 +1,5 @@
 """Doppler Effect Sound Generation Blueprint"""
-
+import io
 import os
 import tempfile
 import atexit
@@ -106,7 +106,7 @@ def analyze_doppler():
             result = {
                 "success": True,
                 "frequency": f"{freq_min:.1f} - {freq_max:.1f} Hz",
-                "velocity": f"{vel_min * 3.6:.1f} to {vel_max * 3.6:.1f} km/h",
+                "velocity": f"{vel_min:.1f} to {vel_max:.1f} m/s",
                 "details": {
                     "frequency_min": float(freq_min),
                     "frequency_max": float(freq_max),
