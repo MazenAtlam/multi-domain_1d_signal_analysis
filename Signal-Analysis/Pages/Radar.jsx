@@ -4,31 +4,170 @@ import Button from '../src/Components/ui/button';
 import Input from '../src/Components/ui/input';
 import SignalViewer from '../src/Components/Radar/SignalViewer.jsx';
 import Footer from '../src/Components/Footer';
-import { isAudioFile, formatTime } from '../src/utils/audioUtils';
+// import { formatTime } from '../src/utils/audioUtils';
 import '../styles/radar.css';
 
 const Radar = () => {
-  const [isDrone, setIsDrone] = useState(false);
-  const [object, setObject] = useState('');
-  const [confidenceLevel, setConfidenceLevel] = useState(0);
+  const [isListening, setIsListening] = useState(false);
+  const [status, setStatus] = useState('Microphone: Inactive');
+  const [predictions, setPredictions] = useState([]);
+  const [showAlert, setShowAlert] = useState(false);
+  const [classLabels, setClassLabels] = useState([]);
+  const recognizerRef = useRef(null);
+  const modelURL = "https://teachablemachine.withgoogle.com/models/nuedEJ711/";
 
+  const [droneIsUsed, setDroneIsUsed] = useState(false);
+  const [sarIsUsed, setSarIsUsed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [currentFile, setCurrentFile] = useState(null);
   const [fileType, setFileType] = useState('');
   const [sarData, setSarData] = useState(null);
-  const audioRef = useRef(null);
-  const progressIntervalRef = useRef(null);
-  const [audioUrl, setAudioUrl] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [audioLoaded, setAudioLoaded] = useState(false);
-  const [duration, setDuration] = useState('');
-  const [audioFileIndex, setAudioFileIndex] = useState(0);
+  // const [duration, setDuration] = useState('');
   const [sarFileIndex, setSarFileIndex] = useState(0);
-  const audioFilesNumber = 5;
   const sarFilesNumber = 0;
   const [message, setMessage] = useState('');
   const [errorHappened, setErrorHappened] = useState(false);
+
+  const createModel = async () => {
+    // Check if speechCommands is available
+    if (!window.speechCommands || !window.speechCommands.create) {
+      setMessage('Speech Commands library not loaded. Please check if TensorFlow.js scripts are properly imported.');
+      setErrorHappened(true);
+      return;
+    }
+
+    const checkpointURL = modelURL + "model.json";
+    const metadataURL = modelURL + "metadata.json";
+
+    try {
+      const recognizer = window.speechCommands.create(
+          "BROWSER_FFT",
+          undefined,
+          checkpointURL,
+          metadataURL
+      );
+
+      await recognizer.ensureModelLoaded();
+      return recognizer;
+    } catch (error) {
+      console.error('Error creating speech recognition model:', error);
+      setMessage(`Failed to load model: ${error.message}`);
+      setErrorHappened(true);
+    }
+  };
+
+  const initDroneDetection = async () => {
+    resetParameters();
+    if (isListening) return;
+
+    // Check if TensorFlow.js is available
+    if (!window.tf) {
+      setMessage('Error: TensorFlow.js not loaded. Please refresh the page.');
+      setErrorHappened(true);
+      return;
+    }
+
+    // Check if speechCommands is available
+    if (!window.speechCommands) {
+      setMessage('Error: Speech Commands library not loaded. Please refresh the page.');
+      setErrorHappened(true);
+      return;
+    }
+
+    try {
+      setDroneIsUsed(true);
+      setIsListening(true);
+      setStatus('Loading model...');
+
+      const recognizer = await createModel();
+      recognizerRef.current = recognizer;
+
+      const labels = recognizer.wordLabels();
+      setClassLabels(labels);
+
+      // Initialize predictions with zero values
+      const initialPredictions = labels.map(label => ({
+        label,
+        probability: 0,
+        percentage: '0%'
+      }));
+      setPredictions(initialPredictions);
+
+      recognizer.listen(result => {
+        const scores = result.scores;
+        let maxScore = 0;
+        let maxIndex = 0;
+
+        const updatedPredictions = labels.map((label, index) => {
+          const probability = scores[index];
+          const percentage = (probability * 100).toFixed(1) + '%';
+
+          if (probability > maxScore) {
+            maxScore = probability;
+            maxIndex = index;
+          }
+
+          return {
+            label,
+            probability,
+            percentage
+          };
+        });
+
+        setPredictions(updatedPredictions);
+
+        // Alert if drone detected with high confidence
+        if (labels[maxIndex].toLowerCase().includes('drone') && maxScore > 0.75) {
+          setShowAlert(true);
+        } else {
+          setShowAlert(false);
+        }
+      }, {
+        includeSpectrogram: true,
+        probabilityThreshold: 0.5,
+        invokeCallbackOnNoiseAndUnknown: true,
+        overlapFactor: 0.50
+      });
+
+      setStatus('Microphone: Active - Listening...');
+    } catch (error) {
+      console.error('Error initializing:', error);
+      setMessage('Error: ' + error.message + '\n\nPlease make sure to allow microphone access and check your internet connection.');
+      setIsListening(false);
+      setErrorHappened(true);
+      setStatus('Error - Click Start to try again');
+    }
+  };
+
+  const stopDroneDetection = () => {
+    if (recognizerRef.current && isListening) {
+      recognizerRef.current.stopListening();
+      setIsListening(false);
+      setStatus('Microphone: Inactive');
+      setShowAlert(false);
+    }
+  };
+
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      if (recognizerRef.current) {
+        recognizerRef.current.stopListening();
+      }
+    };
+  }, []);
+
+  const getPredictionClassName = (probability) => {
+    if (probability > 0.75) return 'prediction detected';
+    if (probability > 0.5) return 'prediction high-confidence';
+    return 'prediction';
+  };
+
+  const getProgressFillClassName = (probability) => {
+    return probability > 0.75 ? 'progress-fill high' : 'progress-fill';
+  };
 
   const isSarFile = (file) => {
     if (!file) return false;
@@ -55,110 +194,12 @@ const Radar = () => {
   const resetParameters = () => {
     setCurrentFile(null);
     setCurrentTime(0);
-    setAudioUrl(null);
-    setAudioLoaded(false);
     setErrorHappened(false);
     setIsPlaying(false);
-  }
-
-  // Function to handle audio play
-  const handlePlayAudio = () => {
-    if (audioRef.current && audioUrl) {
-      audioRef.current.play()
-          .then(() => {
-            setIsPlaying(true);
-            startProgressUpdate();
-          })
-          .catch(error => {
-            console.error('Error playing audio:', error);
-            setMessage('Error playing audio: ' + error.message);
-          });
-    }
-  };
-
-  // Function to handle audio pause
-  const handlePauseAudio = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-      stopProgressUpdate();
-    }
-  };
-
-  // Function to update progress bar
-  const updateProgress = () => {
-    if (audioRef.current) {
-      setCurrentTime(audioRef.current.currentTime);
-
-      // Check if audio ended
-      if (audioRef.current.currentTime >= audioRef.current.duration) {
-        setIsPlaying(false);
-        setCurrentTime(0);
-        stopProgressUpdate();
-      }
-    }
-  };
-
-  // Start progress update interval
-  const startProgressUpdate = () => {
-    progressIntervalRef.current = setInterval(updateProgress, 100);
-  };
-
-  // Stop progress update interval
-  const stopProgressUpdate = () => {
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current);
-      progressIntervalRef.current = null;
-    }
-  };
-
-  // Function to handle audio loaded
-  const handleAudioLoaded = () => {
-    if (audioRef.current) {
-      setDuration(audioRef.current.duration);
-      setAudioLoaded(true);
-      console.log('Audio loaded, duration:', audioRef.current.duration);
-    }
-  };
-
-  const handleAudioFileChange = async (event) => {
-    resetParameters();
-
-    const file = event.target.files[0];
-    event.target.value = '';
-    if (file === undefined || !isAudioFile(file)) {
-      setMessage('Please select a valid audio file (MP3, WAV, OGG, etc.)');
-      setErrorHappened(true);
-      return;
-    }
-
-    // Create object URL from the file
-    const fileUrl = URL.createObjectURL(file);
-    setAudioUrl(fileUrl);
-    console.log('Your audio uploaded successfully');
-    setCurrentFile(file);
-    setFileType('audio');
-    setSarData(null);
-
-    setLoading(true);
+    setDroneIsUsed(false);
+    setSarIsUsed(false);
     setMessage('');
-
-    try {
-      const {isDrone, object, confidenceLevel} = await analyzeDroneAudio(file);
-      setIsDrone(isDrone);
-      setObject(object);
-      setConfidenceLevel(confidenceLevel);
-
-      console.log(`Drone detection results: {isDrone: ${isDrone}, object: ${object}, confidenceLevel: ${confidenceLevel}}`);
-      setMessage("Drone analysis completed successfully.");
-    } catch (error) {
-      console.error('Error uploading signal:', error);
-      setMessage(`Failed to upload signal: ${error.message}`);
-      setErrorHappened(true);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }
 
   const handleSarFileChange = async (event) => {
     resetParameters();
@@ -192,26 +233,32 @@ const Radar = () => {
     }
   };
 
-  const getVisualizerTitle = () => {
-    switch (fileType) {
-      case 'audio':
-        return 'Audio Signal Analysis';
-      case 'sar':
-        return 'SAR Signal Analysis';
-      default:
-        return 'Signal Analysis';
-    }
+  // Function to handle audio play
+  const handlePlay = () => {
+    setIsPlaying(true);
+
+    // if (audioRef.current && audioUrl) {
+    //   audioRef.current.play()
+    //       .then(() => {
+    //         setIsPlaying(true);
+    //         // startProgressUpdate();
+    //       })
+    //       .catch(error => {
+    //         console.error('Error playing audio:', error);
+    //         setMessage('Error playing audio: ' + error.message);
+    //       });
+    // }
   };
 
-  const getVisualizerSubtitle = () => {
-    switch (fileType) {
-      case 'audio':
-        return 'Waveform Visualization - Click on waveform to seek';
-      case 'sar':
-        return 'RF Signal Visualization - Target regions highlighted in red';
-      default:
-        return 'Load data to begin analysis';
-    }
+  // Function to handle audio pause
+  const handlePause = () => {
+    setIsPlaying(false);
+
+    // if (audioRef.current) {
+    //   audioRef.current.pause();
+    //   setIsPlaying(false);
+    //   stopProgressUpdate();
+    // }
   };
 
   const parseSarFile = async (file) => {
@@ -301,48 +348,10 @@ const Radar = () => {
     return new File([data], filename, { type: fileType });
   };
 
-  const handleLoadSampleAudio = async () => {
-    resetParameters();
-
-    setLoading(true);
-    setMessage('');
-
-    // Get sample data from dataset folder
-    const fileNameFromIndex =  audioFileIndex + '.mp3';
-    const fileUrl = '../testing_data/drone/' + fileNameFromIndex;
-    setAudioUrl(fileUrl);
-
-    // Update the index
-    setAudioFileIndex(audioFileIndex >= audioFilesNumber - 1 ? 0 : audioFileIndex + 1)
-
-    console.log('Audio uploaded successfully');
-
-    try {
-      const loaded = await fileFromReference(fileUrl, fileNameFromIndex, 'audio/mpeg');
-      setCurrentFile(loaded);
-
-      const {isDrone, object, confidenceLevel} = await analyzeDroneAudio(loaded);
-      setIsDrone(isDrone);
-      setObject(object);
-      setConfidenceLevel(confidenceLevel);
-      setFileType('audio');
-      setSarData(null);
-
-      console.log(`Drone detection results: {isDrone: ${isDrone}, object: ${object}, confidenceLevel: ${confidenceLevel}}`);
-      setMessage("Drone analysis completed successfully.");
-
-    } catch (error) {
-      console.error('Error uploading signal:', error);
-      setMessage(`Failed to upload signal: ${error.message}`);
-      setErrorHappened(true);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleLoadSampleSar = async () => {
     resetParameters();
 
+    setSarIsUsed(true);
     setLoading(true);
     setMessage('');
 
@@ -372,38 +381,6 @@ const Radar = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const analyzeDroneAudio = async (fileToDetect) => {
-    const formData = new FormData();
-    formData.append('audio', fileToDetect);
-
-    // Optional: Add additional parameters if needed
-    formData.append('filename', fileToDetect.name);
-    formData.append('filetype', fileToDetect.type);
-    formData.append('filesize', fileToDetect.size.toString());
-
-    console.log('Sending audio file to drone detection:', {
-      name: fileToDetect.name,
-      type: fileToDetect.type,
-      size: fileToDetect.size
-    });
-
-    // Make the API request
-    const response = await fetch('/api/drone', {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      setMessage(`Failed to fetch! status: ${response.status}`);
-      console.error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-      setErrorHappened(true);
-    }
-
-    // Parse the JSON response
-    return await response.json();
   };
 
   const analyzeSarData = async (fileToAnalyze) => {
@@ -437,31 +414,6 @@ const Radar = () => {
     // Parse the JSON response
     return await response.json();
   };
-
-  // Cleanup on component unmount
-  useEffect(() => {
-    return () => {
-      stopProgressUpdate();
-      if (audioUrl) {
-        URL.revokeObjectURL(audioUrl);
-      }
-    };
-  }, [audioUrl]);
-
-  // Handle audio end
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (audio) {
-      const handleEnded = () => {
-        setIsPlaying(false);
-        setCurrentTime(0);
-        stopProgressUpdate();
-      };
-
-      audio.addEventListener('ended', handleEnded);
-      return () => audio.removeEventListener('ended', handleEnded);
-    }
-  }, [audioUrl]);
 
   return (
       <div className="radar-container">
@@ -533,40 +485,34 @@ const Radar = () => {
                   </div>
                   <h3>Drone Detection</h3>
                   <p>Identify drones from audio signatures</p>
-                  <div className="file-upload-area">
-                    <div className="upload-content">
-                      <svg className="upload-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M19.07 4.93A10 10 0 0 0 6.99 3.34"></path>
-                        <path d="M4 6h.01"></path>
-                        <path d="M2.29 9.62A10 10 0 1 0 21.31 8.35"></path>
-                        <path d="M16.24 7.76A6 6 0 1 0 8.23 16.67"></path>
-                        <path d="M12 18h.01"></path>
-                        <path d="M17.99 11.66A6 6 0 0 1 15.77 16.67"></path>
-                        <circle cx="12" cy="12" r="2"></circle>
-                        <path d="m13.41 10.59 5.66-5.66"></path>
-                      </svg>
-                      <div>
-                        <p className="upload-title">Load drone audio data</p>
-                        <p className="upload-subtitle">From audio dataset</p>
-                      </div>
-                      <div className="upload-actions">
-                        <Input
-                            type="file"
-                            accept="audio/*"
-                            onChange={handleAudioFileChange}
-                            className="file-input"
-                        />
-                        <p>or</p>
-                        <Button
-                            className="load-sample-btn radar-btn"
-                            onClick={handleLoadSampleAudio}
-                            disabled={loading}
-                        >
-                          Load Some Data
-                        </Button>
-                      </div>
-                    </div>
+                  <div className={`status ${isListening ? 'active' : 'inactive'} mb-3`}>
+                    {status}
                   </div>
+
+                  <div className="controls text-center">
+                    <Button
+                        onClick={initDroneDetection}
+                        disabled={isListening}
+                        className="button player-btn button-scientific"
+                    >
+                      Start Detection
+                    </Button>
+                    <Button
+                        onClick={stopDroneDetection}
+                        disabled={!isListening}
+                        className="button btn btn-outline-danger"
+                    >
+                      Stop Detection
+                    </Button>
+                  </div>
+
+                  {/* Alert */}
+                  {showAlert && (
+                      <div className="alert show mt-3">
+                        <strong>⚠ DRONE DETECTED!</strong>
+                        <p className="mb-0">High confidence drone sound detected in the area.</p>
+                      </div>
+                  )}
                 </div>
               </Card>
 
@@ -610,221 +556,228 @@ const Radar = () => {
               </Card>
             </div>
 
-            <Card className="signal-viewer-card" padding="p-8">
-              <div className="signal-viewer-content">
-                <div className="signal-header">
-                  <div className="w-12 h-12 radar-icon rounded-lg flex items-center justify-center mx-auto">
-                    {loading ? (
-                        <svg className="animate-spin" width="24" height="24"  xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                    ) : (
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M19.07 4.93A10 10 0 0 0 6.99 3.34"></path>
-                          <path d="M4 6h.01"></path>
-                          <path d="M2.29 9.62A10 10 0 1 0 21.31 8.35"></path>
-                          <path d="M16.24 7.76A6 6 0 1 0 8.23 16.67"></path>
-                          <path d="M12 18h.01"></path>
-                          <path d="M17.99 11.66A6 6 0 0 1 15.77 16.67"></path>
-                          <circle cx="12" cy="12" r="2"></circle>
-                          <path d="m13.41 10.59 5.66-5.66"></path>
-                        </svg>
-                    )}
-                  </div>
-                  <h2>{getVisualizerTitle()}</h2>
-                  <p className="signal-subtitle">{getVisualizerSubtitle()}</p>
-                  {currentFile && (
-                      <p className="file-name">File: {currentFile.name}</p>
-                  )}
-                  {fileType === 'sar' && sarData && (
-                      <p className="data-info">
-                        Samples: {sarData.data?.length || 0} | Type: {sarData.type}
-                      </p>
-                  )}
-                </div>
-
-                {/* Message Display */}
-                {message && (
-                    <div className={`p-4 rounded-lg ${
-                        message.includes('successfully')
-                            ? 'message-success bg-green-100 text-green-800 border border-green-200'
-                            : 'message-error bg-red-100 text-red-800 border border-red-200'
-                    }`}>
-                      {message}
-                    </div>
-                )}
-
-                <div className="audio-player">
-                  <div className="text-center space-y-4">
-                    <div className="space-y-2">
-                      {/* Unified Signal Viewer */}
-                      <SignalViewer
-                          file={currentFile}
-                          fileType={fileType}
-                          sarData={sarData}
-                          audioRef={audioRef}
-                          isPlaying={isPlaying}
-                          currentTime={currentTime}
-                          onTimeUpdate={setCurrentTime}
-                      />
-                      <p className="text-sm text-muted-foreground">{formatTime(currentTime)} / {duration ? formatTime(parseFloat(duration)) : formatTime(0)}</p>
-                    </div>
-
-                    <div className="flex justify-center space-x-4">
-                      {fileType === 'audio' && (
-                          isPlaying ? (
-                              <Button
-                                  className="button btn btn-outline-danger"
-                                  onClick={handlePauseAudio}
-                              >
-                                ⏸️ Pause Audio
-                              </Button>
-                          ) : (
-                              <Button
-                                  className="button player-btn button-scientific"
-                                  onClick={handlePlayAudio}
-                                  disabled={!audioLoaded}
-                              >
-                                ▶️ Play Audio
-                              </Button>
-                          )
-                      )}
-                      {fileType === 'sar' && sarData && (
-                          isPlaying ? (
-                              <Button
-                                  className="button btn btn-outline-danger"
-                                  onClick={handlePauseAudio}
-                              >
-                                ⏸️ Pause Signal
-                              </Button>
-                          ) : (
-                              <Button
-                                  className="button player-btn button-scientific"
-                                  onClick={handlePlayAudio}
-                              >
-                                ▶️ Play Signal
-                              </Button>
-                          )
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            {/* Hidden audio element */}
-            <audio
-                ref={audioRef}
-                src={audioUrl || null}
-                onLoadedMetadata={handleAudioLoaded}
-                preload="metadata"
-            />
-
-            {/* Drone Analysis Results */}
-            {fileType === 'audio' && !errorHappened && (
-                <Card className={`analysis-results-card ${isDrone ? 'drone-detected' : 'no-drone'}`} padding="p-6">
-                  <div className="analysis-results">
-                    <h2>Drone Detection Results</h2>
-
-                    <div className="detection-summary">
-                      <div className={`status-indicator ${isDrone ? 'detected' : 'not-detected'}`}>
-                        {isDrone ? '🚁 DRONE DETECTED' : '✅ NO DRONE DETECTED'}
-                      </div>
-
-                      <div className="confidence-level">
-                        <div className="confidence-bar">
-                          <div
-                              className="confidence-fill"
-                              style={{ width: `${confidenceLevel * 100}%` }}
-                          ></div>
+            {droneIsUsed
+                ? (
+                    <>
+                      {/* Drone Results Card */}
+                      <Card className="signal-viewer-card" padding="p-8">
+                        <div className="signal-header">
+                          <div className="w-12 h-12 radar-icon rounded-lg flex items-center justify-center mx-auto">
+                            {loading ? (
+                                <svg className="animate-spin" width="24" height="24"  xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            ) : (
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M19.07 4.93A10 10 0 0 0 6.99 3.34"></path>
+                                  <path d="M4 6h.01"></path>
+                                  <path d="M2.29 9.62A10 10 0 1 0 21.31 8.35"></path>
+                                  <path d="M16.24 7.76A6 6 0 1 0 8.23 16.67"></path>
+                                  <path d="M12 18h.01"></path>
+                                  <path d="M17.99 11.66A6 6 0 0 1 15.77 16.67"></path>
+                                  <circle cx="12" cy="12" r="2"></circle>
+                                  <path d="m13.41 10.59 5.66-5.66"></path>
+                                </svg>
+                            )}
+                          </div>
+                          <h2>Detection Results</h2>
+                          {/* Message Display */}
+                          {message && (
+                              <div className={`p-4 rounded-lg ${
+                                  message.includes('successfully')
+                                      ? 'message-success bg-green-100 text-green-800 border border-green-200'
+                                      : 'message-error bg-red-100 text-red-800 border border-red-200'
+                              }`}>
+                                {message}
+                              </div>
+                          )}
                         </div>
-                        <span className="confidence-text">
-                      Confidence: {(confidenceLevel * 100).toFixed(1)}%
-                    </span>
-                      </div>
-                    </div>
 
-                    <div className="results-grid">
-                      <div className="analysis-section">
-                        <h3>Detection Details</h3>
-                        <div className="result-item">
-                          <span className="label">Object Type:</span>
-                          <span className="value">{object}</span>
+                        <div id="label-container">
+                          {predictions.map((prediction, index) => (
+                              <div
+                                  key={index}
+                                  className={getPredictionClassName(prediction.probability)}
+                              >
+                                <span className="label">{prediction.label}</span>
+                                <div className="d-flex align-items-center">
+                                  <span className="probability me-2">{prediction.percentage}</span>
+                                  <div className="progress-bar">
+                                    <div
+                                        className={getProgressFillClassName(prediction.probability)}
+                                        style={{ width: prediction.percentage }}
+                                    ></div>
+                                  </div>
+                                </div>
+                              </div>
+                          ))}
                         </div>
-                        <div className="result-item">
-                          <span className="label">Detection Status:</span>
-                          <span className="value">{isDrone ? 'Positive' : 'Negative'}</span>
-                        </div>
-                      </div>
-                    </div>
+                      </Card>
+                    </>
+                ) : sarIsUsed ? (
+                    <>
+                      {/*SAR Signal Viewer*/}
+                      <Card className="signal-viewer-card" padding="p-8">
+                        <div className="signal-viewer-content">
+                          <div className="signal-header">
+                            <div className="w-12 h-12 radar-icon rounded-lg flex items-center justify-center mx-auto">
+                              {loading ? (
+                                  <svg className="animate-spin" width="24" height="24"  xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                              ) : (
+                                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M19.07 4.93A10 10 0 0 0 6.99 3.34"></path>
+                                    <path d="M4 6h.01"></path>
+                                    <path d="M2.29 9.62A10 10 0 1 0 21.31 8.35"></path>
+                                    <path d="M16.24 7.76A6 6 0 1 0 8.23 16.67"></path>
+                                    <path d="M12 18h.01"></path>
+                                    <path d="M17.99 11.66A6 6 0 0 1 15.77 16.67"></path>
+                                    <circle cx="12" cy="12" r="2"></circle>
+                                    <path d="m13.41 10.59 5.66-5.66"></path>
+                                  </svg>
+                              )}
+                            </div>
+                            <h2>SAR Signal Analysis</h2>
+                            <p className="signal-subtitle">RF Signal Visualization - Target regions highlighted in red</p>
+                            {currentFile && (
+                                <p className="file-name">File: {currentFile.name}</p>
+                            )}
+                            {fileType === 'sar' && sarData && (
+                                <p className="data-info">
+                                  Samples: {sarData.data?.length || 0} | Type: {sarData.type}
+                                </p>
+                            )}
+                          </div>
 
-                    {isDrone && (
-                        <div className="alert-section">
-                          <div className="alert-message">
-                            ⚠️ Drone activity detected. Consider security protocols.
+                          {/* Message Display */}
+                          {message && (
+                              <div className={`p-4 rounded-lg ${
+                                  message.includes('successfully')
+                                      ? 'message-success bg-green-100 text-green-800 border border-green-200'
+                                      : 'message-error bg-red-100 text-red-800 border border-red-200'
+                              }`}>
+                                {message}
+                              </div>
+                          )}
+
+                          <div className="audio-player">
+                            <div className="text-center space-y-4">
+                              <div className="space-y-2">
+                                {/* Unified Signal Viewer */}
+                                <SignalViewer
+                                    file={currentFile}
+                                    fileType={fileType}
+                                    sarData={sarData}
+                                    isPlaying={isPlaying}
+                                    currentTime={currentTime}
+                                    onTimeUpdate={setCurrentTime}
+                                />
+                                {/*<p className="text-sm text-muted-foreground">{formatTime(currentTime)} / {duration ? formatTime(parseFloat(duration)) : formatTime(0)}</p>*/}
+                              </div>
+
+                              <div className="flex justify-center space-x-4">
+                                {fileType === 'sar' && sarData && (
+                                    isPlaying ? (
+                                        <Button
+                                            className="button btn btn-outline-danger"
+                                            onClick={handlePause}
+                                        >
+                                          ⏸️ Pause Signal
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            className="button player-btn button-scientific"
+                                            onClick={handlePlay}
+                                        >
+                                          ▶️ Play Signal
+                                        </Button>
+                                    )
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </div>
-                    )}
-                  </div>
-                </Card>
-            )}
+                      </Card>
 
-            {/* SAR Analysis Results */}
-            {fileType === 'sar' && !errorHappened && (
-                <Card className="analysis-results-card sar-results" padding="p-6">
-                  <div className="analysis-results">
-                    <h2>SAR Analysis Results</h2>
-                    <div className="results-grid">
-                      <div className="analysis-section">
-                        <h3>Terrain Analysis</h3>
-                        <div className="result-item">
-                          <span className="label">Terrain Type:</span>
-                          <span className="value">terrainType</span>
+                      {/* SAR Analysis Results */}
+                      {fileType === 'sar' && !errorHappened && (
+                          <Card className="analysis-results-card sar-results" padding="p-6">
+                            <div className="analysis-results">
+                              <h2>SAR Analysis Results</h2>
+                              <div className="results-grid">
+                                <div className="analysis-section">
+                                  <h3>Terrain Analysis</h3>
+                                  <div className="result-item">
+                                    <span className="label">Terrain Type:</span>
+                                    <span className="value">terrainType</span>
+                                  </div>
+                                  <div className="result-item">
+                                    <span className="label">Signal Strength:</span>
+                                    <span className="value">signalStrength</span>
+                                  </div>
+                                  <div className="result-item">
+                                    <span className="label">Potential Targets:</span>
+                                    <span className="value">potentialTargets</span>
+                                  </div>
+                                </div>
+
+                                <div className="analysis-section">
+                                  <h3>Signal Statistics</h3>
+                                  <div className="result-item">
+                                    <span className="label">Sample Count:</span>
+                                    <span className="value">sampleCount</span>
+                                  </div>
+                                  <div className="result-item">
+                                    <span className="label">Max Amplitude:</span>
+                                    <span className="value">maxAmplitude</span>
+                                  </div>
+                                  <div className="result-item">
+                                    <span className="label">Signal Variance:</span>
+                                    <span className="value">signalVariance</span>
+                                  </div>
+                                  <div className="result-item">
+                                    <span className="label">Estimated Resolution:</span>
+                                    <span className="value">estimatedResolution</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="recommendations-section">
+                                <h3>Recommendations</h3>
+                                recommendations list
+                                {/*<ul className="recommendations-list">*/}
+                                {/*  {recommendations.map((rec, index) => (*/}
+                                {/*      <li key={index}>{rec}</li>*/}
+                                {/*  ))}*/}
+                                {/*</ul>*/}
+                              </div>
+                            </div>
+                          </Card>
+                      )}
+                    </>
+                ) : (
+                    <Card className="signal-viewer-card" padding="p-8">
+                      <div className="signal-header">
+                        <div className="w-12 h-12 radar-icon rounded-lg flex items-center justify-center mx-auto">
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M19.07 4.93A10 10 0 0 0 6.99 3.34"></path>
+                            <path d="M4 6h.01"></path>
+                            <path d="M2.29 9.62A10 10 0 1 0 21.31 8.35"></path>
+                            <path d="M16.24 7.76A6 6 0 1 0 8.23 16.67"></path>
+                            <path d="M12 18h.01"></path>
+                            <path d="M17.99 11.66A6 6 0 0 1 15.77 16.67"></path>
+                            <circle cx="12" cy="12" r="2"></circle>
+                            <path d="m13.41 10.59 5.66-5.66"></path>
+                          </svg>
                         </div>
-                        <div className="result-item">
-                          <span className="label">Signal Strength:</span>
-                          <span className="value">signalStrength</span>
-                        </div>
-                        <div className="result-item">
-                          <span className="label">Potential Targets:</span>
-                          <span className="value">potentialTargets</span>
-                        </div>
+                        <h2>Radar Analysis Platform</h2>
+                        <p>Choose the type of signal analysis you want to perform: Drone Detection or SAR Classification</p>
                       </div>
-
-                      <div className="analysis-section">
-                        <h3>Signal Statistics</h3>
-                        <div className="result-item">
-                          <span className="label">Sample Count:</span>
-                          <span className="value">sampleCount</span>
-                        </div>
-                        <div className="result-item">
-                          <span className="label">Max Amplitude:</span>
-                          <span className="value">maxAmplitude</span>
-                        </div>
-                        <div className="result-item">
-                          <span className="label">Signal Variance:</span>
-                          <span className="value">signalVariance</span>
-                        </div>
-                        <div className="result-item">
-                          <span className="label">Estimated Resolution:</span>
-                          <span className="value">estimatedResolution</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="recommendations-section">
-                      <h3>Recommendations</h3>
-                      recommendations list
-                      {/*<ul className="recommendations-list">*/}
-                      {/*  {recommendations.map((rec, index) => (*/}
-                      {/*      <li key={index}>{rec}</li>*/}
-                      {/*  ))}*/}
-                      {/*</ul>*/}
-                    </div>
-                  </div>
-                </Card>
-            )}
+                    </Card>
+                ) }
 
             <div className="feature-cards">
               <Card className="feature-card" padding="p-6">
@@ -889,10 +842,10 @@ const Radar = () => {
                     <div>
                       <h4>Drone Detection:</h4>
                       <ul>
-                        <li>• Audio signals at 44.1 kHz or higher</li>
-                        <li>• Clear outdoor recordings preferred</li>
-                        <li>• Duration: 5-60 seconds optimal</li>
-                        <li>• Minimal background noise</li>
+                        <li>• Click "Start Detection" to begin listening</li>
+                        <li>• Allow microphone access when prompted</li>
+                        <li>• The system will analyze sounds in real-time</li>
+                        <li>• Green bars indicate detected sounds with high confidence</li>
                       </ul>
                     </div>
                     <div>
