@@ -1,10 +1,10 @@
 import FeatureCard from "../src/Components/EEG_ECG/FeatureCard";
 import Instructions from "../src/Components/EEG_ECG/Instructions";
-import Footer from "../src/Components/Footer.jsx"
+import Footer from "../src/Components/Footer.jsx";
 import SignalViewerCard from "../src/Components/EEG_ECG/SignalViewerCard";
 import TempNav from "../src/Components/EEG_ECG/TempNav";
 import ECGClassifierPanel from "../src/Components/EEG_ECG/ECGClassifierClient";
-import React, { useRef, useState, useCallback } from "react";
+import React, { useRef, useState, useCallback, useEffect } from "react";
 import Card from "../src/Components/ui/card";
 import Button from "../src/Components/ui/button";
 import "../styles/ecg.css";
@@ -90,6 +90,98 @@ function generateSyntheticECG(times, numChannels = 12) {
   return signals;
 }
 
+// Add XOR Graph Component for ECG
+const XORGraph = ({
+  channels,
+  samplingRate,
+  selected,
+  windowSec,
+  amplitudeScale,
+  leadNames = [],
+  playing = false,
+  speed = 1,
+}) => {
+  const canvasRef = useRef(null);
+
+  // Simple XOR visualization for ECG
+  const drawXORGraph = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Clear canvas
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, width, height);
+
+    // Draw title
+    ctx.fillStyle = "#fff";
+    ctx.font = "16px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("ECG XOR Visualization", width / 2, 30);
+
+    if (!channels.length || !selected.length) {
+      ctx.fillStyle = "#666";
+      ctx.fillText("No ECG data available", width / 2, height / 2);
+      return;
+    }
+
+    // Simple XOR visualization
+    ctx.strokeStyle = "#0f0";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+
+    const samplesToShow = Math.min(500, channels[0]?.length || 0);
+
+    for (let i = 0; i < samplesToShow; i++) {
+      let xorValue = 0;
+
+      // Calculate XOR between selected channels
+      selected.forEach((channelIdx, idx) => {
+        if (channels[channelIdx] && channels[channelIdx][i]) {
+          xorValue ^= channels[channelIdx][i] * 1000; // Scale for visibility
+        }
+      });
+
+      const x = (i / samplesToShow) * width;
+      const y = height / 2 + xorValue * 0.1;
+
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+
+    ctx.stroke();
+  };
+
+  // FIXED: Correct useEffect syntax
+  useEffect(() => {
+    drawXORGraph();
+  }, [channels, selected, windowSec, amplitudeScale, playing]);
+
+  return (
+    <div className="xor-graph-container">
+      <canvas
+        ref={canvasRef}
+        width={800}
+        height={400}
+        style={{
+          border: "1px solid #444",
+          borderRadius: "4px",
+          background: "#000",
+        }}
+      />
+      <div className="mt-2 small text-muted">
+        ECG XOR Visualization: Shows XOR pattern between selected channels
+      </div>
+    </div>
+  );
+};
+
 export default function ECG() {
   const fileInputRef = useRef(null);
   const leadNames = [
@@ -119,17 +211,74 @@ export default function ECG() {
   const [targetHR, setTargetHR] = useState("");
   const [autoPlayOnLoad, setAutoPlayOnLoad] = useState(true);
 
+  // ADDED: Classification states
+  const [classificationResults, setClassificationResults] = useState(null);
+  const [classificationLoading, setClassificationLoading] = useState(false);
+  const [classificationError, setClassificationError] = useState(null);
+  const [classificationLog, setClassificationLog] = useState([]);
+
   const handleFileButtonClick = () => fileInputRef.current?.click();
+
+  // ADDED: Classification function
+  const handleClassificationSubmit = async (file) => {
+    if (!file) return;
+
+    setClassificationError(null);
+    setClassificationLog([]);
+    setClassificationLoading(true);
+
+    try {
+      setClassificationLog((prev) => [
+        ...prev,
+        "Starting ECG classification...",
+      ]);
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      setClassificationLog((prev) => [
+        ...prev,
+        "Uploading ECG data to AI model...",
+      ]);
+
+      // Replace with your actual ECG classification API endpoint
+      const response = await fetch("/api/ecg/classify", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      const results = await response.json();
+      setClassificationLog((prev) => [...prev, "Classification complete!"]);
+      setClassificationResults(results);
+
+      console.log("AI Classification Results:", results);
+    } catch (err) {
+      console.error("Classification error:", err);
+      setClassificationError(err.message);
+      setClassificationLog((prev) => [...prev, `Error: ${err.message}`]);
+    } finally {
+      setClassificationLoading(false);
+    }
+  };
 
   const onFileChange = useCallback(
     async (e) => {
       const file = e.target.files && e.target.files[0];
       if (!file) return;
-      const sendButton = document.querySelector('.sendData');
+
       try {
+        console.log("Loading ECG CSV file:", file.name);
         const parsed = await parseCsv(file);
+        console.log("Parsed data:", parsed);
+
         const parsedChannels = parsed.channels || [];
         const parsedTimes = parsed.times || null;
+
+        console.log(`Found ${parsedChannels.length} channels in CSV`);
 
         let sr = samplingRate;
         if (parsedTimes && parsedTimes.length > 2) {
@@ -146,6 +295,7 @@ export default function ECG() {
             if (!isFinite(sr) || sr <= 0) sr = 250;
           }
         }
+        console.log("Calculated sampling rate:", sr);
 
         const MAX_SAMPLES = 200000;
         let finalChannels = parsedChannels;
@@ -154,6 +304,7 @@ export default function ECG() {
           parsedChannels[0].length > MAX_SAMPLES
         ) {
           const factor = Math.ceil(parsedChannels[0].length / MAX_SAMPLES);
+          console.log(`Downsampling by factor ${factor}`);
           finalChannels = parsedChannels.map((col) => {
             const out = [];
             for (let i = 0; i < col.length; i += factor) {
@@ -171,15 +322,31 @@ export default function ECG() {
         setTimes(parsedTimes);
         setSamplingRate(sr);
 
-        const det = detectMainChannels(finalChannels, 3);
-        if (det.indices && det.indices.length > 0) setSelected(det.indices);
+        // FIXED: Always select up to 12 channels for ECG
+        const availableChannels = finalChannels.length;
+        const channelsToSelect = Math.min(12, availableChannels);
 
-        const primary =
-          finalChannels[
-            det.indices && det.indices.length > 0 ? det.indices[0] : 0
-          ];
-        const hr = estimateHRFromChannel(primary, sr);
+        // If we have exactly 12 channels, select all 12
+        // If we have fewer, select all available
+        // If we have more, select first 12
+        const selectedChannels = Array.from(
+          { length: channelsToSelect },
+          (_, i) => i
+        );
+        setSelected(selectedChannels);
+
+        console.log(
+          `Selected ${selectedChannels.length} channels:`,
+          selectedChannels
+        );
+
+        // For ECG, still detect main channels for HR measurement
+        const det = detectMainChannels(finalChannels, 1); // Just get primary channel for HR
+        const primaryChannel =
+          det.indices && det.indices.length > 0 ? det.indices[0] : 0;
+        const hr = estimateHRFromChannel(finalChannels[primaryChannel], sr);
         setMeasuredHR(hr);
+        console.log("Estimated HR:", hr);
 
         if (targetHR && hr) {
           const t = Number(targetHR);
@@ -188,12 +355,29 @@ export default function ECG() {
           }
         }
 
-        if (autoPlayOnLoad) setPlaying(true);
-        // Automatically trigger send to AI model
-        if (sendButton) sendButton.click();
+        if (autoPlayOnLoad) {
+          setPlaying(true);
+          console.log("Auto-playing signals");
+        }
+
+        // Make sure we're in regular mode for ECG display
+        setMode("regular");
+
+        console.log("ECG CSV file loaded successfully!");
+        console.log(`- Channels: ${finalChannels.length}`);
+        console.log(`- Samples per channel: ${finalChannels[0]?.length || 0}`);
+        console.log(`- Sampling rate: ${sr}Hz`);
+        console.log(`- Selected channels: ${selectedChannels.length}`);
+
+        // ADDED: Automatic AI classification after file load
+        console.log("Starting automatic AI classification...");
+        await handleClassificationSubmit(file);
       } catch (err) {
         console.error("CSV parse error", err);
-        alert("Failed to parse CSV: " + (err.message || err));
+        alert(
+          "Failed to parse CSV file. Please check the file format.\nError: " +
+            (err.message || err)
+        );
       } finally {
         e.target.value = "";
       }
@@ -222,6 +406,7 @@ export default function ECG() {
   };
 
   const handleModeChange = (m) => {
+    console.log("Changing mode to:", m);
     setMode(m);
   };
 
@@ -241,12 +426,18 @@ export default function ECG() {
     setSelected(Array.from({ length: 12 }, (_, i) => i));
     setMeasuredHR(72);
     setPlaying(true);
+    setMode("regular"); // Explicitly set to regular mode when loading data
   };
 
   const clearData = () => {
     setChannels([]);
     setSelected([0]);
     setPlaying(false);
+    setMode("regular");
+    // ADDED: Clear classification results
+    setClassificationResults(null);
+    setClassificationError(null);
+    setClassificationLog([]);
   };
 
   const signalViewerProps = {
@@ -277,6 +468,47 @@ export default function ECG() {
     autoPlayOnLoad,
     setAutoPlayOnLoad,
     onFinish,
+    onClickXOR: () => handleModeChange("xor"), // Add XOR handler
+  };
+
+  // Render the appropriate graph based on mode
+  const renderGraph = () => {
+    switch (mode) {
+      case "xor":
+        return (
+          <XORGraph
+            channels={channels}
+            samplingRate={samplingRate}
+            selected={selected}
+            windowSec={windowSec}
+            amplitudeScale={amplitudeScale}
+            leadNames={leadNames}
+            playing={playing}
+            speed={speed}
+          />
+        );
+      case "regular":
+      case "polar":
+      case "recurrence":
+      default:
+        return (
+          <SignalViewerCard
+            {...signalViewerProps}
+            signalType="ecg"
+            icon={LucideActivity}
+            title1="ECG Signal Viewer"
+            describtion="Visualize ECG signals from dataset with different graph modes"
+            title2="ECG Signal Visualization"
+            describtion2="Select a graph mode to view the signal"
+            onClick1={() => handleModeChange("regular")}
+            onClick2={() => handleModeChange("polar")}
+            onClick3={() => handleModeChange("recurrence")}
+            onClick4={handleFileButtonClick}
+            onClick5={loadSyntheticData}
+            playButton={true}
+          />
+        );
+    }
   };
 
   return (
@@ -287,23 +519,88 @@ export default function ECG() {
         describtion="Electrocardiogram Signal Processing"
       />
       <div className="page bg-body-tertiary py-5">
-        <SignalViewerCard
-          icon={LucideActivity}
-          title1={"ECG Signal Viewer"}
-          describtion={
-            "Visualize ECG signals from dataset with different graph modes"
-          }
-          title2={"ECG Signal Visualization"}
-          describtion2={"Select a graph mode to view the signal"}
-          signalType="ecg"
-          {...signalViewerProps}
-          onClick1={() => handleModeChange("regular")}
-          onClick2={() => handleModeChange("reverse")}
-          onClick3={() => handleModeChange("polar")}
-          onClick4={() => handleModeChange("recurrence")}
-          onClick5={loadSyntheticData}
-          playButton={true}
-        />
+        {renderGraph()}
+
+        {/* ADDED: Classification Results Display */}
+        {classificationResults && (
+          <Card className="p-3 mb-3 col-10 col-xl-6 mx-auto">
+            <h6>AI Classification Results</h6>
+
+            {classificationLog.length > 0 && (
+              <div className="mb-3">
+                <h6>Classification Process</h6>
+                <div
+                  className="terminal p-2 bg-dark text-light rounded small"
+                  style={{
+                    height: "100px",
+                    overflowY: "auto",
+                    fontFamily: "monospace",
+                    whiteSpace: "pre-wrap",
+                    fontSize: "0.8rem",
+                  }}
+                >
+                  {classificationLog.join("\n")}
+                </div>
+              </div>
+            )}
+
+            <div className="alert alert-info">
+              <strong>Diagnosis:</strong>{" "}
+              {classificationResults.diagnosis || "Analysis complete"}
+            </div>
+
+            {classificationResults.confidence && (
+              <div className="mb-2">
+                <strong>Confidence:</strong>{" "}
+                {(classificationResults.confidence * 100).toFixed(1)}%
+                <div className="progress mt-1">
+                  <div
+                    className="progress-bar"
+                    style={{
+                      width: `${classificationResults.confidence * 100}%`,
+                    }}
+                  >
+                    {(classificationResults.confidence * 100).toFixed(1)}%
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {classificationResults.riskLevel && (
+              <div className="mb-2">
+                <strong>Risk Level:</strong>
+                <span
+                  className={`badge ${
+                    classificationResults.riskLevel === "High"
+                      ? "bg-danger"
+                      : classificationResults.riskLevel === "Medium"
+                      ? "bg-warning"
+                      : "bg-success"
+                  } ms-2`}
+                >
+                  {classificationResults.riskLevel}
+                </span>
+              </div>
+            )}
+
+            {classificationError && (
+              <div className="alert alert-danger">
+                <strong>Classification Error:</strong> {classificationError}
+              </div>
+            )}
+          </Card>
+        )}
+
+        {classificationLoading && (
+          <Card className="p-3 mb-3 col-10 col-xl-6 mx-auto">
+            <div className="text-center">
+              <div className="spinner-border text-primary" role="status">
+                <span className="visually-hidden">Loading...</span>
+              </div>
+              <p className="mt-2 mb-0">Analyzing ECG with AI...</p>
+            </div>
+          </Card>
+        )}
 
         <Card className="p-3 mb-3 col-10 col-xl-6 mx-auto">
           <h6>Channels</h6>
@@ -378,7 +675,7 @@ export default function ECG() {
 
           <div className="d-flex gap-2">
             <Button className="btn btn-outline-secondary" onClick={clearData}>
-              Clear Data
+              Clear All Data
             </Button>
           </div>
         </Card>
@@ -409,11 +706,10 @@ export default function ECG() {
         <Instructions
           li1={"ECG signals should be sampled at minimum 250 Hz"}
           li2={"File formats: CSV, TXT, or DAT with time-series data"}
-          // li3={"Maximum file size: 10MB per upload"}
           li4={"For best results, use 12-lead ECG recordings"}
         />
       </div>
-      <Footer/>
+      <Footer />
     </>
   );
 }

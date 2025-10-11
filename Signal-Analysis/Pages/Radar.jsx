@@ -500,7 +500,7 @@ const Radar = () => {
                     <Button
                         onClick={stopDroneDetection}
                         disabled={!isListening}
-                        className="button btn btn-outline-danger"
+                        className="button btn btn-outline-danger ms-4"
                     >
                       Stop Detection
                     </Button>
