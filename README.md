@@ -108,6 +108,8 @@ This project was developed as part of a Digital Signal Processing course, demons
 |:---------------------------------------------------------------------------:|:--------------------------------------------------------------------------------------:|
 | ![Landing About Section: EEG and ECG](deliverables/Home/about_eeg_ecg.jpg)  | ![Landing About Section: Doppler and Radar](deliverables/Home/about_doppler_radar.jpg) |
 
+---
+
 ### ECG (Electrocardiogram)
 
 ![ECG](deliverables/ECG/regular.jpg)
@@ -125,6 +127,8 @@ This project was developed as part of a Digital Signal Processing course, demons
 ![Channels](deliverables/ECG/channels.jpg)
 
 ![Features Cards and Requirements](deliverables/ECG/features_requirements.jpg)
+
+---
 
 ### EEG (Electroencephalogram)
 
@@ -145,6 +149,8 @@ This project was developed as part of a Digital Signal Processing course, demons
 
 ![Features Cards and Requirements](deliverables/EEG/features_requirements.jpg)
 
+---
+
 ### Doppler Effect
 
 ![Doppler](deliverables/Doppler/input_forms.jpg)
@@ -161,6 +167,8 @@ This project was developed as part of a Digital Signal Processing course, demons
 | ![Doppler Sound Generation](deliverables/Doppler/generate.jpg) | ![Doppler Analysis](deliverables/Doppler/analysis.jpg)  |
 
 ![Features Cards and Guidelines](deliverables/Doppler/features_guidelines.jpg)
+
+---
 
 ### Radar Signals
 
