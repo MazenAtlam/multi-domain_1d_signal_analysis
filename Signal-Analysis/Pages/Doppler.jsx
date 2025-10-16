@@ -4,6 +4,7 @@ import Button from "../src/Components/ui/button";
 import Input from "../src/Components/ui/input";
 import Footer from "../src/Components/Footer";
 import SoundVisualizer from "../src/Components/Doppler/SoundVisualizer.jsx";
+import Slider from "../src/Components/aliasing/slider";
 import {formatTime, isAudioFile} from "../src/utils/AudioUtils.js";
 
 const Doppler = () => {
@@ -584,6 +585,20 @@ const Doppler = () => {
                           {message}
                         </div>
                     )}
+
+                    <div className="w-75 h-75 mt-4 mx-auto">
+                      <Slider
+                        loading={loading}
+                        label="Sampling Frequency"
+                        unit="Hz"
+                        min={20}
+                        max={40000}
+                        OnChange={(frequency) => {console.log(`Sampling Frequency = ${frequency}`);}}
+                        handleClearAliasing={() => {console.log("Back to Original Signal");}}
+                        className="w-full rounded-lg appearance-none cursor-pointer"
+                      >
+                      </Slider>
+                    </div>
                   </div>
                 </div>
 
