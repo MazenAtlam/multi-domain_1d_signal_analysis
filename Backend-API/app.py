@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Multi-Domain Signal Analysis Platform
 Unified Flask API with blueprints for ECG analysis and Doppler sound generation
