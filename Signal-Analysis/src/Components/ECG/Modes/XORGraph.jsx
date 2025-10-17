@@ -25,7 +25,7 @@ const XORGraph = ({
     []
   );
 
-  // Process XOR data according to your description
+  // Process XOR data for ECG
   const processedXORData = useMemo(() => {
     if (!channels.length || !samplingRate || selected.length === 0) return null;
 
@@ -52,13 +52,11 @@ const XORGraph = ({
       const invertedVal = invertedData[i];
       const difference = Math.abs(forwardVal - invertedVal);
 
-      // Threshold for similarity - points with small difference are "removed" (not drawn)
-      // Points with large difference are kept (the inverted point is drawn)
-      if (difference > 0.1 * amplitudeScale) {
-        // Adjustable threshold
+      // ECG-optimized threshold (slightly higher for cardiac signals)
+      if (difference > 0.15 * amplitudeScale) {
         xorResult.push({
           index: i,
-          value: invertedVal, // Draw the inverted point when different
+          value: invertedVal,
           forwardValue: forwardVal,
           difference: difference,
           time: i / samplingRate,
@@ -71,7 +69,7 @@ const XORGraph = ({
       invertedData,
       xorResult,
       samplesPerWindow,
-      channelName: leadNames[channelIndex] || `Channel ${channelIndex + 1}`,
+      channelName: leadNames[channelIndex] || `Lead ${channelIndex + 1}`,
     };
   }, [channels, samplingRate, selected, windowSec, amplitudeScale, leadNames]);
 
@@ -81,16 +79,19 @@ const XORGraph = ({
     const graphWidth = width - margin.left - margin.right;
     const graphHeight = height - margin.top - margin.bottom;
 
-    // Clear canvas
-    ctx.fillStyle = "#000";
+    // Clear canvas with dark background
+    const gradient = ctx.createLinearGradient(0, 0, width, height);
+    gradient.addColorStop(0, "#1a1a2e");
+    gradient.addColorStop(1, "#16213e");
+    ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 
     if (!processedXORData) {
-      ctx.fillStyle = "#666";
+      ctx.fillStyle = "#ffffff";
       ctx.font = "16px Arial";
       ctx.textAlign = "center";
       ctx.fillText(
-        "Insufficient data for XOR visualization",
+        "No ECG data available for XOR visualization",
         width / 2,
         height / 2
       );
@@ -106,22 +107,22 @@ const XORGraph = ({
     } = processedXORData;
 
     // Draw title
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = "#ffffff";
     ctx.font = "bold 18px Arial";
     ctx.textAlign = "center";
-    ctx.fillText(`XOR Signal Analysis - ${channelName}`, width / 2, 25);
+    ctx.fillText(`ECG XOR Analysis - ${channelName}`, width / 2, 25);
 
     // Update subtitle based on animation phase
     let subtitle = "";
-    if (phase === 0) subtitle = "Drawing Forward Signal (Green) →";
+    if (phase === 0) subtitle = "Drawing Forward Signal (Blue) →";
     else if (phase === 1) subtitle = "Drawing Inverted Signal (Red) ←";
-    else subtitle = "XOR Result - Only Different Points Remain (Yellow)";
+    else subtitle = "XOR Result - Only Different Points Remain (Gold)";
 
     ctx.font = "14px Arial";
     ctx.fillText(subtitle, width / 2, 45);
 
     // Draw axes
-    ctx.strokeStyle = "#444";
+    ctx.strokeStyle = "#4a4a6a";
     ctx.lineWidth = 1;
 
     // X-axis
@@ -145,7 +146,7 @@ const XORGraph = ({
     ctx.save();
     ctx.translate(15, height / 2);
     ctx.rotate(-Math.PI / 2);
-    ctx.fillText("Amplitude", 0, 0);
+    ctx.fillText("Amplitude (mV)", 0, 0);
     ctx.restore();
 
     // Calculate visible range based on animation phase and progress
@@ -165,10 +166,10 @@ const XORGraph = ({
       showXORPoints = true;
     }
 
-    // Draw forward signal (green) - only in phases 0 and 1
+    // Draw forward signal (blue) - only in phases 0 and 1
     if (visibleForwardSamples > 0 && phase !== 2) {
-      ctx.strokeStyle = "#00ff00";
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "#007bff";
+      ctx.lineWidth = 2;
       ctx.beginPath();
 
       for (let i = 0; i < visibleForwardSamples; i++) {
@@ -189,8 +190,8 @@ const XORGraph = ({
 
     // Draw inverted signal (red) - only in phase 1
     if (visibleInvertedSamples > 0 && phase === 1) {
-      ctx.strokeStyle = "#ff0000";
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "#dc3545";
+      ctx.lineWidth = 2;
       ctx.setLineDash([5, 3]);
       ctx.beginPath();
 
@@ -214,10 +215,10 @@ const XORGraph = ({
       ctx.setLineDash([]);
     }
 
-    // Draw XOR result points (yellow) - only in phase 2
+    // Draw XOR result points (gold) - only in phase 2
     if (showXORPoints) {
-      ctx.fillStyle = "#ffff00";
-      ctx.strokeStyle = "#ffff00";
+      ctx.fillStyle = "#ffd700";
+      ctx.strokeStyle = "#ffd700";
       ctx.lineWidth = 2;
 
       // Draw connecting lines between XOR points
@@ -252,11 +253,11 @@ const XORGraph = ({
       }
     }
 
-    // Draw grid and labels
-    ctx.strokeStyle = "#333";
+    // Draw ECG-optimized grid and labels
+    ctx.strokeStyle = "#4a4a6a";
     ctx.setLineDash([2, 2]);
 
-    // Time grid
+    // Time grid (ECG-specific intervals)
     for (let i = 0; i <= 5; i++) {
       const x = margin.left + (i / 5) * graphWidth;
       const time = (i / 5) * windowSec;
@@ -268,10 +269,10 @@ const XORGraph = ({
 
       ctx.fillStyle = "#888";
       ctx.textAlign = "center";
-      ctx.fillText(time.toFixed(1), x, margin.top + graphHeight + 20);
+      ctx.fillText(time.toFixed(1) + "s", x, margin.top + graphHeight + 20);
     }
 
-    // Amplitude grid
+    // Amplitude grid (ECG voltage scale)
     for (let i = -2; i <= 2; i++) {
       const y = margin.top + graphHeight / 2 - (i * graphHeight) / 4;
 
@@ -282,19 +283,19 @@ const XORGraph = ({
 
       ctx.fillStyle = "#888";
       ctx.textAlign = "right";
-      ctx.fillText(i.toFixed(1), margin.left - 10, y + 4);
+      ctx.fillText(i.toFixed(1) + "mV", margin.left - 10, y + 4);
     }
     ctx.setLineDash([]);
 
-    // Draw legend (simplified for phase 3)
-    const legendX = width - margin.right - 150;
+    // Draw legend
+    const legendX = width - margin.right - 180;
     let legendY = margin.top - 10;
 
     if (phase !== 2) {
       const legends = [
-        { color: "#00ff00", text: "Forward Signal" },
-        { color: "#ff0000", text: "Inverted Signal" },
-        { color: "#ffff00", text: "XOR Points (Different)" },
+        { color: "#007bff", text: "Forward ECG" },
+        { color: "#dc3545", text: "Inverted ECG" },
+        { color: "#ffd700", text: "XOR Points" },
       ];
 
       legends.forEach((legend, index) => {
@@ -314,7 +315,7 @@ const XORGraph = ({
           ctx.fillRect(legendX, legendY, 20, 2);
         }
 
-        ctx.fillStyle = "#fff";
+        ctx.fillStyle = "#ffffff";
         ctx.font = "12px Arial";
         ctx.textAlign = "left";
         ctx.fillText(legend.text, legendX + 25, legendY + 7);
@@ -323,24 +324,24 @@ const XORGraph = ({
       });
     } else {
       // Simplified legend for XOR-only phase
-      ctx.fillStyle = "#ffff00";
+      ctx.fillStyle = "#ffd700";
       ctx.beginPath();
       ctx.arc(legendX + 10, legendY + 5, 3, 0, 2 * Math.PI);
       ctx.fill();
 
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = "#ffffff";
       ctx.font = "12px Arial";
       ctx.textAlign = "left";
-      ctx.fillText("XOR Result Points", legendX + 25, legendY + 7);
+      ctx.fillText("ECG XOR Result", legendX + 25, legendY + 7);
     }
 
-    // Draw phase indicator
-    ctx.fillStyle = "#888";
+    // Draw phase indicator and ECG stats
+    ctx.fillStyle = "#ffffff";
     ctx.font = "12px Arial";
     ctx.textAlign = "left";
     const phases = [
-      "Phase 1: Forward Signal",
-      "Phase 2: Inverted Signal",
+      "Phase 1: Forward ECG",
+      "Phase 2: Inverted ECG",
       "Phase 3: XOR Result Only",
     ];
     ctx.fillText(phases[phase], margin.left, margin.top - 10);
@@ -355,7 +356,12 @@ const XORGraph = ({
 
     ctx.fillText(
       `XOR Points: ${xorResult.length}`,
-      margin.left + 300,
+      margin.left + 320,
+      margin.top - 10
+    );
+    ctx.fillText(
+      `Threshold: ${(0.15 * amplitudeScale).toFixed(2)}mV`,
+      margin.left + 480,
       margin.top - 10
     );
   };
@@ -409,18 +415,19 @@ const XORGraph = ({
         width={dimensions.width}
         height={dimensions.height}
         style={{
-          border: "1px solid #444",
+          border: "2px solid #444",
           borderRadius: "8px",
           background: "#000",
         }}
       />
       <div className="mt-3 small text-muted text-center">
-        <strong>Sequential XOR Logic:</strong>
-        Phase 1: Forward signal draws left to right → Phase 2: Inverted signal
-        draws right to left ← Phase 3: Only XOR result points remain (similar
-        points removed)
+        <strong>ECG XOR Analysis:</strong>
+        Sequential comparison of forward and inverted ECG signals. Phase 1:
+        Forward ECG draws left to right → Phase 2: Inverted ECG draws right to
+        left ← Phase 3: Only XOR result points remain (similar ECG patterns
+        removed)
         {processedXORData &&
-          ` Detected ${processedXORData.xorResult.length} different points.`}
+          ` Detected ${processedXORData.xorResult.length} different cardiac patterns.`}
       </div>
     </div>
   );

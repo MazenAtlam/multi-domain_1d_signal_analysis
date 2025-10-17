@@ -15,7 +15,7 @@ const PolarMode = ({
   const animationRef = useRef(null);
   const [currentTime, setCurrentTime] = useState(0);
 
-  // Dimensions with modern design
+  // Dimensions
   const dimensions = useMemo(
     () => ({
       width: 900,
@@ -75,7 +75,7 @@ const PolarMode = ({
       .attr("width", width)
       .attr("height", height);
 
-    // DARK BLUE GRADIENT BACKGROUND
+    // DARK BLUE GRADIENT BACKGROUND (restored)
     const gradient = svg
       .append("defs")
       .append("linearGradient")
@@ -116,7 +116,7 @@ const PolarMode = ({
         .append("circle")
         .attr("r", radius)
         .attr("fill", "none")
-        .attr("stroke", "#4a4a6a")
+        .attr("stroke", "#4a4a6a") // Dark blue grid lines
         .attr("stroke-width", 1);
     }
 
@@ -129,7 +129,7 @@ const PolarMode = ({
         .attr("y1", 0)
         .attr("x2", maxRadius * 1.1 * Math.cos(angle))
         .attr("y2", maxRadius * 1.1 * Math.sin(angle))
-        .attr("stroke", "#4a4a6a")
+        .attr("stroke", "#4a4a6a") // Dark blue grid lines
         .attr("stroke-width", 1);
     }
 
@@ -148,7 +148,7 @@ const PolarMode = ({
         .attr("y", y)
         .attr("text-anchor", "middle")
         .attr("dominant-baseline", "middle")
-        .attr("fill", "#888")
+        .attr("fill", "#888") // Light gray for labels
         .attr("font-size", "12px")
         .text(`${degrees}°`);
     }
@@ -159,27 +159,27 @@ const PolarMode = ({
       .attr("x", centerX)
       .attr("y", 30)
       .attr("text-anchor", "middle")
-      .attr("fill", "#ffffff")
+      .attr("fill", "#ffffff") // White text
       .attr("font-size", "20px")
       .attr("font-weight", "bold")
-      .text("ECG Polar Plot - Concentric Channels");
+      .text("EEG Polar Plot - Concentric Channels");
 
     svg
       .append("text")
       .attr("x", centerX)
       .attr("y", 55)
       .attr("text-anchor", "middle")
-      .attr("fill", "#ffffff")
+      .attr("fill", "#ffffff") // White text
       .attr("font-size", "14px")
       .text(
         `${polarData.channelData.length} channels displayed as concentric circles`
       );
 
-    // Draw each channel as a concentric FULL circle
+    // Draw each channel as a concentric FULL circle - FIXED: No rotation
     const channelGroup = g.append("g").attr("class", "channels");
 
     polarData.channelData.forEach((channel, channelIndex) => {
-      const { data, name } = channel;
+      const { data, name, index } = channel;
       const radius = baseRadius * (channelIndex + 1);
       const color = d3.schemeCategory10[channelIndex % 10];
 
@@ -187,20 +187,20 @@ const PolarMode = ({
       const progress = playing ? (currentTime * samplingRate) / data.length : 1;
       const pointsToShow = Math.floor(data.length * progress);
 
-      // Create scales for this channel
+      // Create scales for this channel - FIXED: Static mapping, no rotation
       const ampExtent = d3.extent(data);
       const rScale = d3
         .scaleLinear()
         .domain(ampExtent)
         .range([radius * 0.8, radius * 1.2 * amplitudeScale]);
 
-      // Map time to angle statically (no rotation over time)
+      // FIXED: Map time to angle statically (no rotation over time)
       const theta = d3
         .scaleLinear()
         .domain([0, data.length])
         .range([0, 2 * Math.PI]);
 
-      // Create line generator for FULL circle
+      // Create line generator
       const line = d3
         .lineRadial()
         .angle((d, i) => theta(i))
@@ -240,12 +240,12 @@ const PolarMode = ({
           .attr("fill", color)
           .attr("font-size", "10px")
           .attr("dx", point.dx)
-          .text(i === 0 ? name : ""); // Only show name once to avoid clutter
+          .text(i === 0 ? name : ""); // Only show name once
       });
     });
 
     // Draw center point
-    g.append("circle").attr("r", 3).attr("fill", "#ffffff");
+    g.append("circle").attr("r", 2).attr("fill", "#ffffff"); // White center point
 
     // Draw time and amplitude info
     const infoGroup = svg.append("g").attr("class", "info");
@@ -255,7 +255,7 @@ const PolarMode = ({
       .attr("x", centerX)
       .attr("y", height - 30)
       .attr("text-anchor", "middle")
-      .attr("fill", "#ffffff")
+      .attr("fill", "#ffffff") // White text
       .attr("font-size", "14px")
       .text(
         `Time: ${currentTime.toFixed(1)}s / ${(
@@ -268,7 +268,7 @@ const PolarMode = ({
       .attr("x", centerX)
       .attr("y", height - 50)
       .attr("text-anchor", "middle")
-      .attr("fill", "#ffffff")
+      .attr("fill", "#ffffff") // White text
       .attr("font-size", "14px")
       .text(`Amplitude Scale: ${amplitudeScale}`);
 
@@ -281,7 +281,7 @@ const PolarMode = ({
       .append("text")
       .attr("x", legendX)
       .attr("y", legendY)
-      .attr("fill", "#ffffff")
+      .attr("fill", "#ffffff") // White text
       .attr("font-size", "14px")
       .attr("font-weight", "bold")
       .text("Channel Legend");
@@ -304,7 +304,7 @@ const PolarMode = ({
         .append("text")
         .attr("x", legendX + 20)
         .attr("y", legendY)
-        .attr("fill", "#ffffff")
+        .attr("fill", "#ffffff") // White text
         .attr("font-size", "12px")
         .attr("dominant-baseline", "middle")
         .text(channel.name);
@@ -318,10 +318,10 @@ const PolarMode = ({
       .attr("x", centerX)
       .attr("y", height - 10)
       .attr("text-anchor", "middle")
-      .attr("fill", "#888")
+      .attr("fill", "#888") // Light gray
       .attr("font-size", "12px")
       .text(
-        "Each ECG channel is displayed as a concentric circle with radius proportional to channel order"
+        "Each channel is displayed as a concentric circle with radius proportional to channel order"
       );
   }, [
     polarData,
@@ -332,13 +332,13 @@ const PolarMode = ({
     samplingRate,
   ]);
 
-  // Real-time animation for playing mode - ADJUSTED SPEED
+  // Real-time animation for playing mode - ADJUSTED SPEED: Changed from 0.1 to 0.3
   useEffect(() => {
     if (!playing) return;
 
     const animate = () => {
       setCurrentTime((prev) => {
-        const newTime = prev + (16 * speed * 0.3) / 1000; // Adjusted speed
+        const newTime = prev + (16 * speed * 0.3) / 1000; // CHANGED: 0.1 → 0.3 (3x faster)
         const maxTime = channels[0]?.length / samplingRate || 0;
         return newTime >= maxTime ? 0 : newTime;
       });
@@ -374,7 +374,7 @@ const PolarMode = ({
         }}
       />
       <div className="mt-3 small text-muted text-center">
-        <strong>Polar Visualization:</strong> Each ECG channel is displayed as a
+        <strong>Polar Visualization:</strong> Each EEG channel is displayed as a
         concentric FULL circle. Inner circles represent lower channel numbers,
         outer circles represent higher channel numbers. Signal amplitude
         modulates the radius of each channel's path.

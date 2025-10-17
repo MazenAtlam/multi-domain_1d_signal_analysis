@@ -1,6 +1,6 @@
 import "../../../styles/eeg.css";
 import RegularMode from "../../Components/ECG/Modes/RegularMode";
-import PolarMode from "../../Components/ECG/Modes/PolarMode";
+import PolarMode from "../../Components/EEG/PolarMode";
 import RecurrenceMode from "../../Components/EEG/RecurrenceMode";
 import XORGraph from "../../Components/EEG/XORGraph";
 import {
