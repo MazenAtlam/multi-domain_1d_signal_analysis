@@ -591,7 +591,7 @@ const Doppler = () => {
                         loading={loading}
                         label="Sampling Frequency"
                         unit="Hz"
-                        min={20}
+                        min={20000}
                         max={40000}
                         OnChange={(frequency) => {console.log(`Sampling Frequency = ${frequency}`);}}
                         handleClearAliasing={() => {console.log("Back to Original Signal");}}
