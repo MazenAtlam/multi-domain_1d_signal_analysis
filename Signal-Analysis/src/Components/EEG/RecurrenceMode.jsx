@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useMemo } from "react";
 
 export default function RecurrenceMode({
   channels,
@@ -14,78 +14,20 @@ export default function RecurrenceMode({
   const canvasRef = useRef(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const animationRef = useRef(null);
-  const [dimension, setDimension] = useState(2); // Embedding dimension
-  const [delay, setDelay] = useState(1); // Time delay
-  const [threshold, setThreshold] = useState(0.1); // Recurrence threshold
+  const [dimension, setDimension] = useState(2);
+  const [delay, setDelay] = useState(1);
+  const [threshold, setThreshold] = useState(0.1);
+  const [recurrenceStats, setRecurrenceStats] = useState(null);
 
-  // Function to create delay coordinates for phase space reconstruction
-  const createDelayCoordinates = (signal, dimension, delay) => {
-    const vectors = [];
-    for (let i = 0; i <= signal.length - (dimension - 1) * delay; i++) {
-      const vector = [];
-      for (let j = 0; j < dimension; j++) {
-        vector.push(signal[i + j * delay]);
-      }
-      vectors.push(vector);
-    }
-    return vectors;
-  };
-
-  // Function to calculate Euclidean distance between two vectors
-  const euclideanDistance = (vec1, vec2) => {
-    let sum = 0;
-    for (let i = 0; i < vec1.length; i++) {
-      sum += Math.pow(vec1[i] - vec2[i], 2);
-    }
-    return Math.sqrt(sum);
-  };
-
-  // Function to create recurrence plot matrix
-  const createRecurrenceMatrix = (vectors, threshold) => {
-    const N = vectors.length;
-    const matrix = Array(N)
-      .fill()
-      .map(() => Array(N).fill(0));
-
-    for (let i = 0; i < N; i++) {
-      for (let j = 0; j < N; j++) {
-        const dist = euclideanDistance(vectors[i], vectors[j]);
-        matrix[i][j] = dist <= threshold ? 1 : 0;
-      }
-    }
-    return matrix;
-  };
-
-  // Function to normalize signal
-  const normalizeSignal = (signal) => {
-    if (signal.length === 0) return signal;
-    const min = Math.min(...signal);
-    const max = Math.max(...signal);
-    const range = max - min;
-    if (range === 0) return signal.map(() => 0.5);
-    return signal.map((val) => (val - min) / range);
-  };
-
-  // Main drawing function
-  const drawRecurrencePlot = () => {
-    const canvas = canvasRef.current;
-    if (!canvas || !channels || channels.length === 0 || selected.length === 0)
-      return;
-
-    const ctx = canvas.getContext("2d");
-    const width = canvas.width;
-    const height = canvas.height;
-
-    // Clear canvas
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, width, height);
+  // Memoized phase space reconstruction
+  const phaseSpaceData = useMemo(() => {
+    if (!channels?.length || selected.length === 0) return null;
 
     const channelIndex = selected[0];
     const signal = channels[channelIndex];
+    if (!signal || signal.length === 0) return null;
 
-    if (!signal || signal.length === 0) return;
-
-    // Get current window of data
+    // Get current window
     const startIndex = Math.max(
       0,
       currentIndex - Math.floor((windowSec * samplingRate) / 2)
@@ -96,67 +38,171 @@ export default function RecurrenceMode({
     );
     const windowData = signal.slice(startIndex, endIndex);
 
-    if (windowData.length < dimension * delay) return;
+    if (windowData.length < dimension * delay) return null;
 
-    // Normalize the signal window
-    const normalizedSignal = normalizeSignal(windowData);
+    // Normalize
+    const min = Math.min(...windowData);
+    const max = Math.max(...windowData);
+    const range = max - min;
+    const normalized =
+      range === 0
+        ? windowData.map(() => 0.5)
+        : windowData.map((val) => (val - min) / range);
 
-    // Create phase space vectors
-    const vectors = createDelayCoordinates(normalizedSignal, dimension, delay);
+    // Create delay vectors
+    const vectors = [];
+    for (let i = 0; i <= normalized.length - (dimension - 1) * delay; i++) {
+      const vector = [];
+      for (let j = 0; j < dimension; j++) {
+        vector.push(normalized[i + j * delay]);
+      }
+      vectors.push(vector);
+    }
 
-    if (vectors.length === 0) return;
+    return { vectors, normalized, windowData };
+  }, [
+    channels,
+    selected,
+    currentIndex,
+    windowSec,
+    samplingRate,
+    dimension,
+    delay,
+  ]);
 
-    // Create recurrence matrix
-    const recurrenceMatrix = createRecurrenceMatrix(vectors, threshold);
+  // Memoized recurrence plot and statistics
+  const recurrenceData = useMemo(() => {
+    if (!phaseSpaceData) return null;
 
-    // Draw recurrence plot
-    const cellSize = Math.min(width, height) / recurrenceMatrix.length;
+    const { vectors } = phaseSpaceData;
+    const N = vectors.length;
+    const matrix = Array(N)
+      .fill()
+      .map(() => Array(N).fill(0));
 
-    for (let i = 0; i < recurrenceMatrix.length; i++) {
-      for (let j = 0; j < recurrenceMatrix[i].length; j++) {
-        if (recurrenceMatrix[i][j] === 1) {
-          // Use different colors based on distance from diagonal for better visualization
+    let recurrencePoints = 0;
+    const lineLengths = [];
+
+    // Build recurrence matrix and calculate statistics
+    for (let i = 0; i < N; i++) {
+      let currentLineLength = 0;
+
+      for (let j = 0; j < N; j++) {
+        let sumSq = 0;
+        for (let k = 0; k < dimension; k++) {
+          sumSq += Math.pow(vectors[i][k] - vectors[j][k], 2);
+        }
+        const dist = Math.sqrt(sumSq);
+
+        if (dist <= threshold) {
+          matrix[i][j] = 1;
+          recurrencePoints++;
+          currentLineLength++;
+        } else {
+          if (currentLineLength > 0) {
+            lineLengths.push(currentLineLength);
+            currentLineLength = 0;
+          }
+        }
+      }
+
+      if (currentLineLength > 0) {
+        lineLengths.push(currentLineLength);
+      }
+    }
+
+    // Calculate recurrence rate
+    const recurrenceRate = recurrencePoints / (N * N);
+
+    // Calculate determinism (percentage of points forming diagonal lines)
+    const diagonalLines = lineLengths.filter((len) => len > 1);
+    const determinism =
+      diagonalLines.length > 0
+        ? diagonalLines.reduce((a, b) => a + b, 0) / recurrencePoints
+        : 0;
+
+    // Calculate entropy (Shannon entropy of line lengths)
+    const lineLengthCounts = {};
+    lineLengths.forEach((len) => {
+      lineLengthCounts[len] = (lineLengthCounts[len] || 0) + 1;
+    });
+
+    let entropy = 0;
+    Object.values(lineLengthCounts).forEach((count) => {
+      const p = count / lineLengths.length;
+      entropy -= p * Math.log(p);
+    });
+
+    setRecurrenceStats({
+      recurrenceRate: (recurrenceRate * 100).toFixed(2),
+      determinism: (determinism * 100).toFixed(2),
+      entropy: entropy.toFixed(3),
+      totalPoints: recurrencePoints,
+    });
+
+    return matrix;
+  }, [phaseSpaceData, threshold, dimension]);
+
+  // Drawing function
+  const drawRecurrencePlot = () => {
+    const canvas = canvasRef.current;
+    if (!canvas || !recurrenceData) return;
+
+    const ctx = canvas.getContext("2d");
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Clear with dark background
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, width, height);
+
+    const matrix = recurrenceData;
+    const N = matrix.length;
+    const cellSize = Math.min(width, height) / N;
+
+    // Draw recurrence plot with color coding based on distance from diagonal
+    for (let i = 0; i < N; i++) {
+      for (let j = 0; j < N; j++) {
+        if (matrix[i][j] === 1) {
           const distanceFromDiagonal = Math.abs(i - j);
-          const intensity = Math.max(
-            0,
-            1 - distanceFromDiagonal / recurrenceMatrix.length
-          );
+          const intensity = Math.max(0, 1 - distanceFromDiagonal / N);
 
-          ctx.fillStyle = `rgb(0, ${Math.floor(255 * intensity)}, ${Math.floor(
-            255 * (1 - intensity)
+          // Color gradient from cyan (recent) to blue (distant)
+          ctx.fillStyle = `rgb(0, ${Math.floor(200 * intensity)}, ${Math.floor(
+            255 * intensity
           )})`;
           ctx.fillRect(j * cellSize, i * cellSize, cellSize, cellSize);
         }
       }
     }
 
-    // Draw diagonal line
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+    // Draw main diagonal
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(width, height);
     ctx.stroke();
 
-    // Add labels and information
-    ctx.fillStyle = "white";
-    ctx.font = "12px Arial";
-    ctx.fillText(`Dimension: ${dimension}`, 10, 20);
-    ctx.fillText(`Delay: ${delay}`, 10, 35);
-    ctx.fillText(`Threshold: ${threshold.toFixed(2)}`, 10, 50);
-    ctx.fillText(
-      `Matrix: ${recurrenceMatrix.length}x${recurrenceMatrix.length}`,
-      10,
-      65
-    );
+    // Draw info text
+    if (!compact) {
+      ctx.fillStyle = "white";
+      ctx.font = "12px Arial";
+      ctx.fillText(
+        `Dimension: ${dimension} | Delay: ${delay} | Threshold: ${threshold.toFixed(
+          2
+        )}`,
+        10,
+        15
+      );
+      ctx.fillText(`Matrix: ${N}×${N} | Window: ${windowSec}s`, 10, 30);
+    }
   };
 
-  // Animation loop
+  // Animation
   useEffect(() => {
-    if (!playing || !channels || channels.length === 0) {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
+    if (!playing || !channels?.length) {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
       return;
     }
 
@@ -164,7 +210,7 @@ export default function RecurrenceMode({
       setCurrentIndex((prev) => {
         const newIndex = prev + Math.floor((speed * samplingRate) / 10);
         if (newIndex >= channels[0].length) {
-          if (onFinish) onFinish();
+          onFinish?.();
           return 0;
         }
         return newIndex;
@@ -173,50 +219,20 @@ export default function RecurrenceMode({
     };
 
     animationRef.current = requestAnimationFrame(animate);
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
+    return () => cancelAnimationFrame(animationRef.current);
   }, [playing, speed, samplingRate, channels, onFinish]);
 
   // Redraw when dependencies change
   useEffect(() => {
     drawRecurrencePlot();
-  }, [
-    currentIndex,
-    dimension,
-    delay,
-    threshold,
-    channels,
-    selected,
-    windowSec,
-    amplitudeScale,
-  ]);
+  }, [recurrenceData, compact]);
 
-  // Handle canvas resize
-  useEffect(() => {
-    const handleResize = () => {
-      drawRecurrencePlot();
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  const canvasStyle = compact
-    ? {
-        width: "100%",
-        height: "200px",
-        border: "1px solid #333",
-        borderRadius: "4px",
-      }
-    : {
-        width: "100%",
-        height: "400px",
-        border: "1px solid #333",
-        borderRadius: "8px",
-      };
+  const canvasStyle = {
+    width: "100%",
+    height: compact ? "200px" : "400px",
+    border: "1px solid #333",
+    borderRadius: compact ? "4px" : "8px",
+  };
 
   return (
     <div
@@ -227,7 +243,7 @@ export default function RecurrenceMode({
         <div className="controls mb-3">
           <div className="row g-2">
             <div className="col-md-4">
-              <label className="form-label small">Dimension</label>
+              <label className="form-label small">Dimension: {dimension}</label>
               <input
                 type="range"
                 className="form-range"
@@ -237,10 +253,9 @@ export default function RecurrenceMode({
                 value={dimension}
                 onChange={(e) => setDimension(parseInt(e.target.value))}
               />
-              <div className="text-center small">{dimension}</div>
             </div>
             <div className="col-md-4">
-              <label className="form-label small">Delay</label>
+              <label className="form-label small">Delay: {delay}</label>
               <input
                 type="range"
                 className="form-range"
@@ -250,10 +265,11 @@ export default function RecurrenceMode({
                 value={delay}
                 onChange={(e) => setDelay(parseInt(e.target.value))}
               />
-              <div className="text-center small">{delay}</div>
             </div>
             <div className="col-md-4">
-              <label className="form-label small">Threshold</label>
+              <label className="form-label small">
+                Threshold: {threshold.toFixed(2)}
+              </label>
               <input
                 type="range"
                 className="form-range"
@@ -263,7 +279,6 @@ export default function RecurrenceMode({
                 value={threshold}
                 onChange={(e) => setThreshold(parseFloat(e.target.value))}
               />
-              <div className="text-center small">{threshold.toFixed(2)}</div>
             </div>
           </div>
         </div>
@@ -276,38 +291,30 @@ export default function RecurrenceMode({
         height={compact ? 200 : 400}
       />
 
-      {!compact && (
-        <div className="info-panel mt-2">
-          <div className="row text-center small">
-            <div className="col-md-4">
-              <strong>Recurrence Rate:</strong>
-              <br />
-              {channels && channels.length > 0 && selected.length > 0
-                ? "Calculating..."
-                : "N/A"}
+      {!compact && recurrenceStats && (
+        <div className="info-panel mt-3 p-2 bg-dark rounded">
+          <div className="row text-center small text-white">
+            <div className="col-md-3">
+              <strong>Recurrence Rate</strong>
+              <div>{recurrenceStats.recurrenceRate}%</div>
             </div>
-            <div className="col-md-4">
-              <strong>Determinism:</strong>
-              <br />
-              {channels && channels.length > 0 && selected.length > 0
-                ? "Calculating..."
-                : "N/A"}
+            <div className="col-md-3">
+              <strong>Determinism</strong>
+              <div>{recurrenceStats.determinism}%</div>
             </div>
-            <div className="col-md-4">
-              <strong>Entropy:</strong>
-              <br />
-              {channels && channels.length > 0 && selected.length > 0
-                ? "Calculating..."
-                : "N/A"}
+            <div className="col-md-3">
+              <strong>Entropy</strong>
+              <div>{recurrenceStats.entropy}</div>
+            </div>
+            <div className="col-md-3">
+              <strong>Points</strong>
+              <div>{recurrenceStats.totalPoints}</div>
             </div>
           </div>
         </div>
       )}
 
-      <div
-        className="color-legend mt-2 text-center small"
-        style={{ color: "#666" }}
-      >
+      <div className="color-legend mt-2 text-center small text-muted">
         <span style={{ color: "#00ffff" }}>●</span> Recent recurrence |
         <span style={{ color: "#0000ff" }}>●</span> Distant recurrence
       </div>
