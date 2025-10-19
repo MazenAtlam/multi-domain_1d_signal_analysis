@@ -10,6 +10,7 @@ import "../styles/ecg.css";
 import { parseCsv } from "../src/utils/parseCsv";
 import { detectMainChannels } from "../src/utils/detectMainChannels";
 import { Activity as LucideActivity } from "lucide-react";
+import Slider from "../src/Components/aliasing/slider.jsx"
 
 // Import the enhanced components
 import XORGraph from "../src/Components/ECG/Modes/XORGraph";
@@ -198,7 +199,8 @@ export default function ECG() {
   const [measuredHR, setMeasuredHR] = useState(null);
   const [targetHR, setTargetHR] = useState("");
   const [autoPlayOnLoad, setAutoPlayOnLoad] = useState(true);
-
+  // aliasing 
+  const [requiredFmax, setRequiredFmax] = useState(0);
   // Enhanced classification states
   const [classificationResults, setClassificationResults] = useState(null);
   const [classificationLoading, setClassificationLoading] = useState(false);
@@ -218,6 +220,17 @@ export default function ECG() {
     fileInputRef.current?.click();
     setIsMockData(false);
   };
+  // aliasing handeler manage fmax
+  const handleFmaxChange = useCallback((newFmax) => {
+    setRequiredFmax(newFmax);
+    console.log(`Nyquist analysis: Required Fmax set to ${newFmax} Hz. Required Sampling Rate: ${2 * newFmax} Hz`);
+  }, []);
+
+  // Function to clear the fmax slider
+  const handleClearFmax = useCallback(() => {
+    setRequiredFmax(0);
+    console.log("Fmax slider cleared.");
+  }, []);
 
   // Enhanced classification function
   const handleClassificationSubmit = async (file) => {
@@ -347,6 +360,8 @@ export default function ECG() {
         setChannels(finalChannels);
         setTimes(parsedTimes);
         setSamplingRate(sr);
+        // Aliasing slider
+        setRequiredFmax(0);
 
         // Select all available channels (up to 12)
         const availableChannels = finalChannels.length;
@@ -400,7 +415,7 @@ export default function ECG() {
         e.target.value = "";
       }
     },
-    [samplingRate, targetHR, autoPlayOnLoad]
+    [samplingRate, targetHR, autoPlayOnLoad, setRequiredFmax]
   );
 
   const handleApplyTargetHR = () => {
@@ -629,7 +644,24 @@ export default function ECG() {
         <div className="container-fluid">
           <div className="row justify-content-center">{renderGraph()}</div>
         </div>
-
+{/* NEW SLIDER CARD (Placed under SignalViewerCard) */}
+{channels.length > 0 && mode === "regular" && (
+    <Card className="p-3 mb-3 col-10 col-xl-6 mx-auto">
+        <h6 className="mb-3">Nyquist Filtering Analysis (Current $\mathbf{"f_s"}$: {samplingRate}Hz)</h6>
+        <Slider
+            OnChange={handleFmaxChange}
+            handleClearAliasing={handleClearFmax}
+            label={`Max Signal Frequency to Preserve ($athbf{f_{max}}$)`}
+            unit="Hz"
+            min={0}
+            max={Math.floor(samplingRate / 2)} 
+            initialValue={requiredFmax}
+        />
+        <small className="text-muted d-block mt-2">
+            **Nyquist Criterion:** The maximum frequency component that can be captured without aliasing is $f_s/2$, which is **{samplingRate / 2} Hz**. Selecting an $\mathbff_max$ greater than this limit will result in aliasing.
+        </small>
+    </Card>
+)}
         {/* Classification Results Section */}
         {(classificationResults || classificationLoading) && (
           <Card className="p-3 mb-3 col-10 col-xl-6 mx-auto">
