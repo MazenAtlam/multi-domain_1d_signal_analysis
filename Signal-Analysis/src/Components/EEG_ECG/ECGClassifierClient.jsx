@@ -7,7 +7,9 @@ const DEFAULTS = {
 };
 
 class ECGClassifierClient {
-  constructor(apiUrl = "https://fleshier-alvin-appealingly.ngrok-free.dev/api/ecg") {
+  constructor(
+    apiUrl = "https://fleshier-alvin-appealingly.ngrok-free.dev/api/ecg"
+  ) {
     this.apiUrl = apiUrl;
   }
 
@@ -119,9 +121,7 @@ export default function ECGClassifierPanel() {
                   >
                     <td>{pred.abnormality}</td>
                     <td>{pred.percentage}</td>
-                    <td>
-                      {pred.detected ? "✓ Detected" : "✗ Not detected"}
-                    </td>
+                    <td>{pred.detected ? "✓ Detected" : "✗ Not detected"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -137,4 +137,3 @@ export default function ECGClassifierPanel() {
     </div>
   );
 }
-
