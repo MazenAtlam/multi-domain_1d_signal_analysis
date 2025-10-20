@@ -10,9 +10,8 @@ import "../styles/ecg.css";
 import { parseCsv } from "../src/utils/parseCsv";
 import { detectMainChannels } from "../src/utils/detectMainChannels";
 import { Activity as LucideActivity } from "lucide-react";
-import Slider from "../src/Components/aliasing/slider.jsx"
-
-// Import the enhanced components
+import Slider from "../src/Components/aliasing/slider.jsx";
+import { resampleECG } from "../src/utils/resampleECG.js";
 import XORGraph from "../src/Components/ECG/Modes/XORGraph";
 import RecurrenceMode from "../src/Components/ECG/Modes/RecurrenceMode";
 import PolarMode from "../src/Components/ECG/Modes/PolarMode";
@@ -199,8 +198,7 @@ export default function ECG() {
   const [measuredHR, setMeasuredHR] = useState(null);
   const [targetHR, setTargetHR] = useState("");
   const [autoPlayOnLoad, setAutoPlayOnLoad] = useState(true);
-  // aliasing 
-  const [requiredFmax, setRequiredFmax] = useState(0);
+
   // Enhanced classification states
   const [classificationResults, setClassificationResults] = useState(null);
   const [classificationLoading, setClassificationLoading] = useState(false);
@@ -208,6 +206,10 @@ export default function ECG() {
   const [classificationLog, setClassificationLog] = useState([]);
   const [isMockData, setIsMockData] = useState(false);
   const logRef = useRef(null);
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [resampleMode, setResampleMode] = useState("safe");
+  // Aliasing state - moved after other state declarations
+  const [requiredFmax, setRequiredFmax] = useState(0);
 
   // Auto-scroll log
   useEffect(() => {
@@ -220,11 +222,83 @@ export default function ECG() {
     fileInputRef.current?.click();
     setIsMockData(false);
   };
-  // aliasing handeler manage fmax
-  const handleFmaxChange = useCallback((newFmax) => {
-    setRequiredFmax(newFmax);
-    console.log(`Nyquist analysis: Required Fmax set to ${newFmax} Hz. Required Sampling Rate: ${2 * newFmax} Hz`);
-  }, []);
+
+  const handleResampleSubmit = async () => {
+    if (!uploadedFile || requiredFmax === 0) {
+      alert(
+        "Please load an ECG file and select a target frequency (f_max) first."
+      );
+      return;
+    }
+
+    setClassificationError(null);
+    setClassificationLog((prev) => [
+      ...prev,
+      ` Starting ${resampleMode} resampling for f_max=${requiredFmax} Hz...`,
+    ]);
+    setClassificationLoading(true);
+
+    try {
+      const targetSr = 2 * requiredFmax; // The minimum required sampling rate
+      const nyquistFreq = samplingRate / 2;
+
+      if (targetSr > samplingRate) {
+        throw new Error(
+          `Cannot resample: Target f_max (${requiredFmax} Hz) requires a sampling rate of ${targetSr} Hz, which is higher than the original rate (${samplingRate} Hz).`
+        );
+      }
+
+      const blob = await resampleECG(
+        uploadedFile,
+        requiredFmax,
+        resampleMode,
+        samplingRate
+      );
+
+      // Initiate download of the resampled file
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `resampled_${requiredFmax}hz_${resampleMode}.csv`;
+      a.click();
+      URL.revokeObjectURL(url); // Clean up
+
+      setClassificationLog((prev) => [
+        ...prev,
+        `✅ Resampling successful! File download started for mode: ${resampleMode}.`,
+      ]);
+    } catch (err) {
+      console.error("Resampling error:", err);
+      setClassificationError(`Resampling Failed: ${err.message}`);
+      setClassificationLog((prev) => [
+        ...prev,
+        `❌ Error: Resampling failed. ${err.message}`,
+      ]);
+    } finally {
+      setClassificationLoading(false);
+    }
+  };
+
+  // Aliasing handler - manage fmax
+  const handleFmaxChange = useCallback(
+    (newFmax) => {
+      setRequiredFmax(newFmax);
+      console.log(
+        `Nyquist analysis: Required Fmax set to ${newFmax} Hz. Required Sampling Rate: ${
+          2 * newFmax
+        } Hz`
+      );
+
+      // Add aliasing detection logic here
+      const nyquistFrequency = samplingRate / 2;
+      if (newFmax > nyquistFrequency) {
+        console.warn(
+          `ALIASING DETECTED: Required fmax (${newFmax} Hz) exceeds Nyquist frequency (${nyquistFrequency} Hz)`
+        );
+      }
+    },
+    [samplingRate]
+  );
 
   // Function to clear the fmax slider
   const handleClearFmax = useCallback(() => {
@@ -360,7 +434,7 @@ export default function ECG() {
         setChannels(finalChannels);
         setTimes(parsedTimes);
         setSamplingRate(sr);
-        // Aliasing slider
+        // Reset aliasing slider when new file is loaded
         setRequiredFmax(0);
 
         // Select all available channels (up to 12)
@@ -404,7 +478,7 @@ export default function ECG() {
         console.log(`- Samples per channel: ${finalChannels[0]?.length || 0}`);
         console.log(`- Sampling rate: ${sr}Hz`);
         console.log(`- Selected channels: ${selectedChannels.length}`);
-
+        setUploadedFile(file);
         // Automatic AI classification after file load
         console.log("Starting automatic AI classification...");
         await handleClassificationSubmit(file);
@@ -415,7 +489,7 @@ export default function ECG() {
         e.target.value = "";
       }
     },
-    [samplingRate, targetHR, autoPlayOnLoad, setRequiredFmax]
+    [samplingRate, targetHR, autoPlayOnLoad]
   );
 
   const handleApplyTargetHR = () => {
@@ -458,6 +532,14 @@ export default function ECG() {
     );
     const signals = generateSyntheticECG(t, 12);
 
+    const mockCsvContent = signals
+      .map((_, i) => [t[i], ...signals.map((ch) => ch[i])].join(","))
+      .join("\n");
+    const mockFile = new File([mockCsvContent], "synthetic_ecg.csv", {
+      type: "text/csv",
+    });
+    setUploadedFile(mockFile); // NEW
+
     setChannels(signals);
     setSamplingRate(samplingRate);
     setSelected(Array.from({ length: 12 }, (_, i) => i));
@@ -465,6 +547,8 @@ export default function ECG() {
     setPlaying(true);
     setMode("regular");
     setIsMockData(true);
+    // Reset aliasing slider for synthetic data
+    setRequiredFmax(0);
 
     // Mock classification for synthetic data
     setTimeout(() => {
@@ -488,6 +572,7 @@ export default function ECG() {
     setClassificationError(null);
     setClassificationLog([]);
     setIsMockData(false);
+    setRequiredFmax(0);
   };
 
   const signalViewerProps = {
@@ -640,28 +725,114 @@ export default function ECG() {
             <strong>Notice:</strong> {classificationError}
           </div>
         )}
-
         <div className="container-fluid">
           <div className="row justify-content-center">{renderGraph()}</div>
         </div>
-{/* NEW SLIDER CARD (Placed under SignalViewerCard) */}
-{channels.length > 0 && mode === "regular" && (
-    <Card className="p-3 mb-3 col-10 col-xl-6 mx-auto">
-        <h6 className="mb-3">Nyquist Filtering Analysis (Current $\mathbf{"f_s"}$: {samplingRate}Hz)</h6>
-        <Slider
-            OnChange={handleFmaxChange}
-            handleClearAliasing={handleClearFmax}
-            label={`Max Signal Frequency to Preserve ($athbf{f_{max}}$)`}
-            unit="Hz"
-            min={0}
-            max={Math.floor(samplingRate / 2)} 
-            initialValue={requiredFmax}
-        />
-        <small className="text-muted d-block mt-2">
-            **Nyquist Criterion:** The maximum frequency component that can be captured without aliasing is $f_s/2$, which is **{samplingRate / 2} Hz**. Selecting an $\mathbff_max$ greater than this limit will result in aliasing.
-        </small>
-    </Card>
-)}
+        {/* NEW SLIDER CARD - Placed under SignalViewerCard */}
+        {channels.length > 0 && mode === "regular" && (
+          <Card className="p-3 mb-3 col-10 col-xl-6 mx-auto">
+            <h6 className="mb-3">
+              Nyquist Filtering Analysis (Current{" "}
+              <strong>
+                f<sub>s</sub>
+              </strong>
+              : {samplingRate} Hz)
+            </h6>
+            <Slider
+              OnChange={handleFmaxChange}
+              handleClearAliasing={handleClearFmax}
+              label={`Max Signal Frequency to Preserve (f_max)`}
+              unit="Hz"
+              min={0}
+              max={Math.floor(samplingRate / 2)}
+              initialValue={requiredFmax}
+            />
+            <div className="mt-3 p-3 bg-light rounded">
+              <h6 className="mb-2">Nyquist Analysis</h6>
+              <div className="small">
+                <div>
+                  <strong>
+                    Current Sampling Rate (f<sub>s</sub>):
+                  </strong>{" "}
+                  {samplingRate} Hz
+                </div>
+                <div>
+                  <strong>
+                    Nyquist Frequency (f<sub>s</sub>/2):
+                  </strong>{" "}
+                  {samplingRate / 2} Hz
+                </div>
+                <div>
+                  <strong>
+                    Selected f<sub>max</sub>:
+                  </strong>{" "}
+                  {requiredFmax} Hz
+                </div>
+                {requiredFmax > 0 && (
+                  <div
+                    className={`mt-2 ${
+                      requiredFmax > samplingRate / 2
+                        ? "text-danger"
+                        : "text-success"
+                    }`}
+                  >
+                    <strong>
+                      {requiredFmax > samplingRate / 2
+                        ? "⚠ ALIASING DETECTED: f_max exceeds Nyquist frequency!"
+                        : "✓ No aliasing: f_max within safe range"}
+                    </strong>
+                  </div>
+                )}
+              </div>
+            </div>
+            <small className="text-muted d-block mt-2">
+              <strong>Nyquist Criterion:</strong> The maximum frequency
+              component that can be captured without aliasing is f<sub>s</sub>
+              /2, which is <strong>{samplingRate / 2} Hz</strong>. Selecting an
+              f<sub>max</sub> greater than this limit will result in aliasing.
+            </small>
+          </Card>
+        )}
+        // NEW: Resampling Controls Card
+        {channels.length > 0 && mode === "regular" && requiredFmax > 0 && (
+          <Card className="p-3 mb-3 col-10 col-xl-6 mx-auto d-flex flex-column gap-3">
+            <h6>Resampling Mode Selection</h6>
+            <div className="d-flex gap-3 justify-content-between">
+              <Button
+                className={`btn ${
+                  resampleMode === "safe"
+                    ? "btn-success"
+                    : "btn-outline-success"
+                }`}
+                onClick={() => setResampleMode("safe")}
+              >
+                ✅ Safe Mode (Anti-Alias Filter)
+              </Button>
+              <Button
+                className={`btn ${
+                  resampleMode === "demo" ? "btn-danger" : "btn-outline-danger"
+                }`}
+                onClick={() => setResampleMode("demo")}
+              >
+                ⚠ Demo Mode (Allow Aliasing)
+              </Button>
+            </div>
+            <small className="text-muted">
+              *Current Action:* Filter signal at{" "}
+              <strong>fₘₐₓ = {requiredFmax} Hz</strong> and conceptually
+              downsample to <strong>fₛ ≈ {requiredFmax * 2} Hz</strong>.
+            </small>
+            <Button
+              className="btn btn-primary btn-lg mt-2"
+              onClick={handleResampleSubmit}
+              disabled={classificationLoading}
+            >
+              {classificationLoading
+                ? "Processing..."
+                : `🔄 Resample & Download (${resampleMode.toUpperCase()})`}
+            </Button>
+          </Card>
+        )}
         {/* Classification Results Section */}
         {(classificationResults || classificationLoading) && (
           <Card className="p-3 mb-3 col-10 col-xl-6 mx-auto">
@@ -701,7 +872,6 @@ export default function ECG() {
             )}
           </Card>
         )}
-
         {/* Channel Selection and Analysis */}
         {channels.length > 0 && (
           <Card className="p-3 mb-3 col-10 col-xl-6 mx-auto">
@@ -786,7 +956,6 @@ export default function ECG() {
             </div>
           </Card>
         )}
-
         {/* Features Section */}
         <div className="features col-11 col-xl-7 mx-auto my-4 d-flex flex-wrap gap-4 justify-content-center">
           <FeatureCard
@@ -821,8 +990,11 @@ export default function ECG() {
               "Visualize signal recurrence patterns for non-linear dynamics analysis"
             }
           />
+          <FeatureCard
+            fetTitle={"Aliasing Detection"}
+            fetDes={"Nyquist frequency analysis and anti-aliasing filtering"}
+          />
         </div>
-
         {/* Instructions Section */}
         <Instructions
           li1={"ECG signals should be sampled at minimum 250 Hz"}
@@ -832,6 +1004,7 @@ export default function ECG() {
           li5={"Include all standard leads for comprehensive analysis"}
           li6={"AI classification supports multiple ECG file formats"}
           li7={"XOR and recurrence modes available for advanced analysis"}
+          li8={"Use aliasing slider to analyze Nyquist frequency compliance"}
         />
       </div>
       <Footer />
