@@ -1,5 +1,5 @@
 import hero from "../../assets/hero.jpg";
-import { Activity, Brain, Radar, Waves } from "lucide-react";
+import { Activity, Brain, Radar, Waves, Mic } from "lucide-react";
 import FirstSectionCard from "./Cards/FirstSectionCard";
 import "../../../styles/firstSection.css";
 
@@ -36,6 +36,14 @@ export default function Section1() {
       icon: Radar,
       path: "/radar",
       color: "green",
+    },
+    {
+      id: "recognition",
+      title: "Voice Recognition",
+      description: "Voice Recognition & Anti-aliasing",
+      icon: Mic,
+      path: "/recognition",
+      color: "blue",
     },
   ];
 
