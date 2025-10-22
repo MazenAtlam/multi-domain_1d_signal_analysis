@@ -9,6 +9,7 @@ import "../styles/ecg.css";
 import { parseCsv } from "../src/utils/parseCsv";
 import { Activity as LucideActivity } from "lucide-react";
 import axios from "axios";
+import { resampleEEG } from "../src/utils/resampleEEG.js";
 
 // Import the components we've created
 import XORGraph from "../src/Components/EEG/XORGraph";
@@ -283,7 +284,7 @@ export default function EEG() {
   const [requiredFmax, setRequiredFmax] = useState(0);
   const [resampleMode, setResampleMode] = useState("safe");
   const [uploadedFile, setUploadedFile] = useState(null);
-  const [aliasingLoading, setAliasingLoading] = useState(false); // Separate loading state for aliasing
+  const [aliasingLoading, setAliasingLoading] = useState(false);
 
   // Auto-scroll log
   useEffect(() => {
@@ -302,7 +303,6 @@ export default function EEG() {
         } Hz`
       );
 
-      // Add aliasing detection logic here
       const nyquistFrequency = samplingRate / 2;
       if (newFmax > nyquistFrequency) {
         console.warn(
@@ -333,10 +333,10 @@ export default function EEG() {
       ...prev,
       ` Starting ${resampleMode} resampling for f_max=${requiredFmax} Hz...`,
     ]);
-    setAliasingLoading(true); // Use aliasing loading instead
+    setAliasingLoading(true);
 
     try {
-      const targetSr = 2 * requiredFmax; // The minimum required sampling rate
+      const targetSr = 2 * requiredFmax;
       const nyquistFreq = samplingRate / 2;
 
       if (targetSr > samplingRate) {
@@ -345,20 +345,13 @@ export default function EEG() {
         );
       }
 
-      // Call the EEG aliasing API for resampling
-      const formData = new FormData();
-      formData.append("file", uploadedFile);
-      formData.append("target_sr", targetSr.toString());
-      formData.append("mode", resampleMode);
-
-      const response = await fetch("/api/eeg_aliasing/resample", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) throw new Error("Resampling failed");
-
-      const blob = await response.blob();
+      // FIX: Use the resampleEEG function instead of direct fetch
+      const blob = await resampleEEG(
+        uploadedFile,
+        requiredFmax,
+        resampleMode,
+        samplingRate
+      );
 
       // Initiate download of the resampled file
       const url = URL.createObjectURL(blob);
@@ -366,7 +359,7 @@ export default function EEG() {
       a.href = url;
       a.download = `eeg_resampled_${targetSr}Hz_${resampleMode}.csv`;
       a.click();
-      URL.revokeObjectURL(url); // Clean up
+      URL.revokeObjectURL(url);
 
       setLog((prev) => [
         ...prev,
@@ -380,7 +373,7 @@ export default function EEG() {
         `❌ Error: Resampling failed. ${err.message}`,
       ]);
     } finally {
-      setAliasingLoading(false); // Use aliasing loading instead
+      setAliasingLoading(false);
     }
   };
 
@@ -475,7 +468,7 @@ export default function EEG() {
     setIsMockData(false);
   };
 
-  // FIXED: Proper file change handler
+  // FIXED: Proper file change handler with better error handling and no input clearing
   const onFileChange = useCallback(
     async (e) => {
       const file = e.target.files && e.target.files[0];
@@ -492,12 +485,55 @@ export default function EEG() {
         let sr = samplingRate;
 
         if (fileName.endsWith(".csv") || fileName.endsWith(".txt")) {
+          // First, read the file content to see what we're dealing with
+          const fileText = await file.text();
+          const lines = fileText.split("\n").filter((line) => line.trim());
+
+          console.log("EEG File analysis:");
+          console.log("- Total lines:", lines.length);
+          console.log("- First line (headers):", lines[0]);
+          if (lines.length > 1) {
+            console.log("- Second line (sample data):", lines[1]);
+          }
+
           // Handle CSV/TXT files
           const parsed = await parseCsv(file);
-          console.log("Parsed CSV:", parsed);
+          console.log("ParseCsv result:", {
+            channels: parsed.channels?.length,
+            times: parsed.times?.length,
+            hasChannels: !!parsed.channels && parsed.channels.length > 0,
+            hasTimes: !!parsed.times && parsed.times.length > 0,
+          });
 
           parsedChannels = parsed.channels || [];
           parsedTimes = parsed.times || null;
+
+          // If parseCsv didn't work well, try manual parsing for EEG format
+          if (parsedChannels.length === 0 && lines.length > 1) {
+            console.log("Manual parsing fallback for EEG...");
+            const headers = lines[0].split(",").map((h) => h.trim());
+            parsedChannels = Array.from({ length: headers.length }, () => []);
+
+            for (let i = 1; i < lines.length; i++) {
+              const values = lines[i]
+                .split(",")
+                .map((v) => parseFloat(v.trim()));
+              values.forEach((value, idx) => {
+                if (!isNaN(value) && parsedChannels[idx]) {
+                  parsedChannels[idx].push(value);
+                }
+              });
+            }
+
+            // If first column looks like time, separate it
+            if (
+              headers[0].toLowerCase() === "time" &&
+              parsedChannels.length > 0
+            ) {
+              parsedTimes = parsedChannels[0];
+              parsedChannels = parsedChannels.slice(1);
+            }
+          }
 
           // Calculate sampling rate from times
           if (parsedTimes && parsedTimes.length > 2) {
@@ -513,43 +549,37 @@ export default function EEG() {
               }
               if (!isFinite(sr) || sr <= 0) sr = 250;
             }
+            console.log("Calculated sampling rate:", sr, "Hz");
+          } else {
+            console.log("Using default sampling rate:", sr, "Hz");
           }
         } else if (fileName.endsWith(".set")) {
           // Handle .set files (MATLAB format)
           console.log("Processing .set file");
 
-          // For .set files, we need to use a different approach
-          // You'll need to implement .set file parsing here
-          // This is a placeholder - you'll need to add actual .set parsing logic
-
-          // For now, let's create mock data for demonstration
-          const duration = 30; // seconds
-          sr = 250; // typical EEG sampling rate
+          // For .set files, create mock data for demonstration
+          const duration = 30;
+          sr = 250;
           const totalSamples = duration * sr;
 
-          // Generate 12 channels of synthetic EEG data
           parsedChannels = Array.from({ length: 12 }, (_, channelIdx) =>
             Array.from({ length: totalSamples }, (_, sampleIdx) => {
               const t = sampleIdx / sr;
-              // Generate realistic EEG-like signals for each channel
               let value = 0;
 
-              // Different frequency components for each channel
-              value += 0.5 * Math.sin(2 * Math.PI * 2 * t + channelIdx * 0.5); // Delta
-              value += 0.3 * Math.sin(2 * Math.PI * 6 * t + channelIdx * 0.3); // Theta
-              value += 0.4 * Math.sin(2 * Math.PI * 10 * t + channelIdx * 0.2); // Alpha
-              value += 0.2 * Math.sin(2 * Math.PI * 20 * t + channelIdx * 0.1); // Beta
+              value += 0.5 * Math.sin(2 * Math.PI * 2 * t + channelIdx * 0.5);
+              value += 0.3 * Math.sin(2 * Math.PI * 6 * t + channelIdx * 0.3);
+              value += 0.4 * Math.sin(2 * Math.PI * 10 * t + channelIdx * 0.2);
+              value += 0.2 * Math.sin(2 * Math.PI * 20 * t + channelIdx * 0.1);
 
-              // Add some noise and channel-specific characteristics
               value += 0.1 * (Math.random() - 0.5);
-              value *= 0.8 + channelIdx * 0.05; // Scale differently per channel
+              value *= 0.8 + channelIdx * 0.05;
 
               return value;
             })
           );
 
           parsedTimes = Array.from({ length: totalSamples }, (_, i) => i / sr);
-
           console.log(
             `Generated ${parsedChannels.length} channels of EEG data`
           );
@@ -560,13 +590,21 @@ export default function EEG() {
           return;
         }
 
+        console.log(
+          `Final EEG channels: ${parsedChannels.length}, samples: ${
+            parsedChannels[0]?.length || 0
+          }`
+        );
+
+        // Only proceed if we have valid data
+        if (parsedChannels.length === 0 || parsedChannels[0].length === 0) {
+          throw new Error("No valid EEG data found in the file");
+        }
+
         // Downsample if needed
         const MAX_SAMPLES = 200000;
         let finalChannels = parsedChannels;
-        if (
-          parsedChannels.length > 0 &&
-          parsedChannels[0].length > MAX_SAMPLES
-        ) {
+        if (parsedChannels[0].length > MAX_SAMPLES) {
           const factor = Math.ceil(parsedChannels[0].length / MAX_SAMPLES);
           finalChannels = parsedChannels.map((col) => {
             const out = [];
@@ -581,13 +619,13 @@ export default function EEG() {
           });
         }
 
+        // Update state all at once
         setChannels(finalChannels);
         setTimes(parsedTimes);
         setSamplingRate(sr);
-        // NEW: Set uploaded file for aliasing
         setUploadedFile(file);
 
-        // Analyze ALL channels (not just first few)
+        // Analyze ALL channels
         const analysis = {};
         const channelsToAnalyze = Math.min(12, finalChannels.length);
         for (let i = 0; i < channelsToAnalyze; i++) {
@@ -598,7 +636,7 @@ export default function EEG() {
         }
         setChannelAnalysis(analysis);
 
-        // Select ALL channels by default (up to 12)
+        // Select ALL channels by default
         const defaultSelected = Array.from(
           { length: Math.min(12, finalChannels.length) },
           (_, i) => i
@@ -611,12 +649,17 @@ export default function EEG() {
 
         // Call classification AFTER data is loaded and displayed
         handleClassificationSubmit(file);
+
+        console.log("EEG file loaded successfully!");
       } catch (err) {
         console.error("File processing error", err);
         alert("Failed to process file: " + (err.message || err));
-      } finally {
-        e.target.value = "";
+
+        // Reset states on error
+        setChannels([]);
+        setPlaying(false);
       }
+      // REMOVED: e.target.value = "" - Don't clear the file input
     },
     [samplingRate, autoPlayOnLoad]
   );
@@ -649,7 +692,7 @@ export default function EEG() {
     try {
       console.log("Loading synthetic EEG data...");
       const samplingRate = 250;
-      const duration = 30; // seconds
+      const duration = 10; // Reduced duration for better performance
       const t = Array.from(
         { length: duration * samplingRate },
         (_, i) => i / samplingRate
@@ -661,31 +704,36 @@ export default function EEG() {
           const time = t[sampleIdx];
           let value = 0;
 
-          // Different frequency components for each channel
-          value += 0.5 * Math.sin(2 * Math.PI * 2 * time + channelIdx * 0.5); // Delta
-          value += 0.3 * Math.sin(2 * Math.PI * 6 * time + channelIdx * 0.3); // Theta
-          value += 0.4 * Math.sin(2 * Math.PI * 10 * time + channelIdx * 0.2); // Alpha
-          value += 0.2 * Math.sin(2 * Math.PI * 20 * time + channelIdx * 0.1); // Beta
+          value += 0.5 * Math.sin(2 * Math.PI * 2 * time + channelIdx * 0.5);
+          value += 0.3 * Math.sin(2 * Math.PI * 6 * time + channelIdx * 0.3);
+          value += 0.4 * Math.sin(2 * Math.PI * 10 * time + channelIdx * 0.2);
+          value += 0.2 * Math.sin(2 * Math.PI * 20 * time + channelIdx * 0.1);
 
-          // Add some noise and channel-specific characteristics
           value += 0.1 * (Math.random() - 0.5);
-          value *= 0.8 + channelIdx * 0.05; // Scale differently per channel
+          value *= 0.8 + channelIdx * 0.05;
 
           return value;
         })
       );
 
-      // Create CSV content
-      const header = ["time", ...eegLeadNames.slice(0, 12)].join(",");
+      // Create properly formatted CSV with time column and EEG lead names
+      const headers = ["time", ...eegLeadNames.slice(0, 12)];
+
       const rows = t.map((time, i) => {
         const channelValues = signals.map((channel) => channel[i].toFixed(6));
-        return [time.toFixed(4), ...channelValues].join(",");
+        return [time.toFixed(6), ...channelValues].join(",");
       });
-      const csvContent = [header, ...rows].join("\n");
+
+      const csvContent = [headers.join(","), ...rows].join("\n");
 
       const mockFile = new File([csvContent], "synthetic_eeg.csv", {
         type: "text/csv",
       });
+
+      console.log("Created synthetic EEG file with proper format");
+      console.log("- Headers:", headers);
+      console.log("- Sampling rate:", samplingRate, "Hz");
+      console.log("- Total samples:", t.length);
 
       // Create a DataTransfer to simulate file selection
       const dataTransfer = new DataTransfer();
@@ -719,7 +767,6 @@ export default function EEG() {
     setLog([]);
     setError(null);
     setIsMockData(false);
-    // NEW: Clear aliasing states
     setRequiredFmax(0);
     setUploadedFile(null);
     setAliasingLoading(false);
@@ -824,9 +871,9 @@ export default function EEG() {
             onClick1={() => handleModeChange("regular")}
             onClick2={() => handleModeChange("polar")}
             onClick3={() => handleModeChange("recurrence")}
-            onClick4={handleFileButtonClick} // File selection
-            onClick5={loadSyntheticData} // Synthetic data
-            onClick6={() => handleModeChange("xor")} // XOR mode
+            onClick4={handleFileButtonClick}
+            onClick5={loadSyntheticData}
+            onClick6={() => handleModeChange("xor")}
             playButton={true}
           />
         );
@@ -874,7 +921,7 @@ export default function EEG() {
               min={0}
               max={Math.floor(samplingRate / 2)}
               initialValue={requiredFmax}
-              loading={aliasingLoading} // Use aliasingLoading instead of loading
+              loading={aliasingLoading}
               errorHappened={!!error}
             />
             <div className="mt-3 p-3 bg-light rounded">
@@ -918,10 +965,9 @@ export default function EEG() {
             <small className="text-muted d-block mt-2">
               <strong>EEG Nyquist Criterion:</strong> The maximum frequency
               component that can be captured without aliasing is f<sub>s</sub>
-              /2, which is <strong>{samplingRate / 2} Hz</strong>. Selecting an
-              f<sub>max</sub> greater than this limit will result in aliasing.
-              Typical EEG frequencies: Delta (0.5-4Hz), Theta (4-8Hz), Alpha
-              (8-13Hz), Beta (13-30Hz), Gamma (30-100Hz).
+              /2, which is <strong>{samplingRate / 2} Hz</strong>. Typical EEG
+              frequencies: Delta (0.5-4Hz), Theta (4-8Hz), Alpha (8-13Hz), Beta
+              (13-30Hz), Gamma (30-100Hz).
             </small>
           </Card>
         )}
@@ -958,9 +1004,9 @@ export default function EEG() {
             <Button
               className="btn btn-primary btn-lg mt-2"
               onClick={handleResampleSubmit}
-              disabled={aliasingLoading} // Use aliasingLoading instead of loading
+              disabled={aliasingLoading}
             >
-              {aliasingLoading // Use aliasingLoading instead of loading
+              {aliasingLoading
                 ? "Processing..."
                 : `🔄 Resample & Download EEG (${resampleMode.toUpperCase()})`}
             </Button>
@@ -968,7 +1014,7 @@ export default function EEG() {
         )}
 
         {/* Aliasing Detection Section */}
-        {channels.length > 0 && (
+        {/* {channels.length > 0 && (
           <Card className="p-3 mb-3 col-10 col-xl-6 mx-auto">
             <AliasingDetection
               channels={channels}
@@ -977,7 +1023,7 @@ export default function EEG() {
               signalType="EEG"
             />
           </Card>
-        )}
+        )} */}
 
         {/* EEG Classification Section */}
         {results && (
@@ -1023,7 +1069,6 @@ export default function EEG() {
               <label className="form-label small">
                 Select visible channels
               </label>
-
               <select
                 className="form-select"
                 multiple
