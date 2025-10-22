@@ -11,7 +11,7 @@ export async function resampleEEG(file, targetFmax, mode, originalSr) {
         throw new Error("No EEG file available for resampling.");
     }
     
-    // Using the EEG aliasing API endpoint
+    // Use the proxy path like in the documentation examples
     const url = '/api/eeg_aliasing/resample'; 
     
     const formData = new FormData();
@@ -20,11 +20,13 @@ export async function resampleEEG(file, targetFmax, mode, originalSr) {
     // Calculate target sampling rate based on Nyquist criterion
     const targetSr = 2 * targetFmax;
     
-    // Send parameters to the EEG aliasing API
+    // Send parameters exactly as shown in documentation
     formData.append('target_sr', targetSr.toString());
     formData.append('mode', mode);
-    // Note: The original_sr might be used by backend for validation
-    formData.append('original_sr', originalSr.toString());
+    // Note: The documentation doesn't show sending original_sr, but it might be helpful
+
+    console.log(`Calling EEG resample API: ${url}`);
+    console.log(`Parameters: target_sr=${targetSr}, mode=${mode}`);
 
     const response = await fetch(url, {
         method: 'POST',
@@ -32,7 +34,6 @@ export async function resampleEEG(file, targetFmax, mode, originalSr) {
     });
 
     if (!response.ok) {
-        // Attempt to parse a JSON error message if the response body is available
         let errorBody = await response.text();
         try {
             const errorJson = JSON.parse(errorBody);

@@ -63,24 +63,28 @@ function generateSyntheticECG(times, numChannels = 12) {
       const phase = (t + ch * 0.015) % period;
       let value = 0;
 
+      // P wave (atrial depolarization)
       if (phase > 0.1 && phase < 0.2) {
         value += 0.15 * Math.sin((Math.PI * (phase - 0.1)) / 0.1);
       }
 
+      // QRS complex (ventricular depolarization)
       if (phase > 0.2 && phase < 0.25) {
-        value += -1.2 * Math.exp(-Math.pow((phase - 0.22) / 0.015, 2));
+        value += -1.2 * Math.exp(-Math.pow((phase - 0.22) / 0.015, 2)); // Q wave
       }
       if (phase > 0.23 && phase < 0.27) {
-        value += 2.5 * Math.exp(-Math.pow((phase - 0.24) / 0.01, 2));
+        value += 2.5 * Math.exp(-Math.pow((phase - 0.24) / 0.01, 2)); // R wave
       }
       if (phase > 0.25 && phase < 0.3) {
-        value += -0.7 * Math.exp(-Math.pow((phase - 0.27) / 0.02, 2));
+        value += -0.7 * Math.exp(-Math.pow((phase - 0.27) / 0.02, 2)); // S wave
       }
 
+      // T wave (ventricular repolarization)
       if (phase > 0.35 && phase < 0.5) {
         value += 0.35 * Math.sin((Math.PI * (phase - 0.35)) / 0.15);
       }
 
+      // Add channel-specific characteristics and noise
       value *= 1 + ch * 0.05;
       value += 0.02 * (Math.random() - 0.5);
 
@@ -363,6 +367,8 @@ export default function ECG() {
   };
 
   // FIXED: Proper file change handler from old ECG page
+  // FIXED: Proper file change handler from old ECG page
+  // FIXED: Proper file change handler
   const onFileChange = useCallback(
     async (e) => {
       const file = e.target.files && e.target.files[0];
@@ -379,45 +385,91 @@ export default function ECG() {
           file.name.toLowerCase().endsWith(".csv") ||
           file.name.toLowerCase().endsWith(".txt")
         ) {
-          // Handle CSV/TXT files
+          // First, read the file content to see what we're dealing with
+          const fileText = await file.text();
+          const lines = fileText.split("\n").filter((line) => line.trim());
+
+          console.log("File analysis:");
+          console.log("- Total lines:", lines.length);
+          console.log("- First line (headers):", lines[0]);
+          if (lines.length > 1) {
+            console.log("- Second line (sample data):", lines[1]);
+          }
+
+          // Parse the CSV
           const parsed = await parseCsv(file);
-          console.log("Parsed CSV:", parsed);
+          console.log("ParseCsv result:", {
+            channels: parsed.channels?.length,
+            times: parsed.times?.length,
+            hasChannels: !!parsed.channels && parsed.channels.length > 0,
+            hasTimes: !!parsed.times && parsed.times.length > 0,
+          });
 
           parsedChannels = parsed.channels || [];
           parsedTimes = parsed.times || null;
 
-          // Calculate sampling rate from times
+          // If parseCsv didn't work well, try manual parsing
+          if (parsedChannels.length === 0 && lines.length > 1) {
+            console.log("Manual parsing fallback...");
+            const headers = lines[0].split(",").map((h) => h.trim());
+            parsedChannels = Array.from({ length: headers.length }, () => []);
+
+            for (let i = 1; i < lines.length; i++) {
+              const values = lines[i]
+                .split(",")
+                .map((v) => parseFloat(v.trim()));
+              values.forEach((value, idx) => {
+                if (!isNaN(value) && parsedChannels[idx]) {
+                  parsedChannels[idx].push(value);
+                }
+              });
+            }
+
+            // If first column looks like time, separate it
+            if (
+              headers[0].toLowerCase() === "time" &&
+              parsedChannels.length > 0
+            ) {
+              parsedTimes = parsedChannels[0];
+              parsedChannels = parsedChannels.slice(1);
+            }
+          }
+
+          // Calculate sampling rate from times or use default
           if (parsedTimes && parsedTimes.length > 2) {
             const diffs = [];
             for (let i = 1; i < parsedTimes.length; i++)
               diffs.push(Math.abs(parsedTimes[i] - parsedTimes[i - 1]));
             const md = median(diffs);
             if (md > 0) {
-              if (md > 1) {
-                sr = Math.round(1000 / md);
-              } else {
-                sr = Math.round(1 / md);
-              }
+              sr = md > 1 ? Math.round(1000 / md) : Math.round(1 / md);
               if (!isFinite(sr) || sr <= 0) sr = 250;
             }
+            console.log("Calculated sampling rate:", sr, "Hz");
+          } else {
+            console.log("Using default sampling rate:", sr, "Hz");
           }
         } else {
           alert("Unsupported file format. Please use .csv or .txt files.");
           return;
         }
 
-        console.log(`Found ${parsedChannels.length} channels`);
-        console.log("Calculated sampling rate:", sr);
+        console.log(
+          `Final channels: ${parsedChannels.length}, samples: ${
+            parsedChannels[0]?.length || 0
+          }`
+        );
 
-        // Downsample if needed
+        // Only proceed if we have valid data
+        if (parsedChannels.length === 0 || parsedChannels[0].length === 0) {
+          throw new Error("No valid data found in the file");
+        }
+
+        // Downsample if needed (keep this logic)
         const MAX_SAMPLES = 200000;
         let finalChannels = parsedChannels;
-        if (
-          parsedChannels.length > 0 &&
-          parsedChannels[0].length > MAX_SAMPLES
-        ) {
+        if (parsedChannels[0].length > MAX_SAMPLES) {
           const factor = Math.ceil(parsedChannels[0].length / MAX_SAMPLES);
-          console.log(`Downsampling by factor ${factor}`);
           finalChannels = parsedChannels.map((col) => {
             const out = [];
             for (let i = 0; i < col.length; i += factor) {
@@ -431,62 +483,47 @@ export default function ECG() {
           });
         }
 
+        // Update state - do this all at once to prevent flickering
         setChannels(finalChannels);
         setTimes(parsedTimes);
         setSamplingRate(sr);
-        // Reset aliasing slider when new file is loaded
         setRequiredFmax(0);
 
-        // Select all available channels (up to 12)
-        const availableChannels = finalChannels.length;
-        const channelsToSelect = Math.min(12, availableChannels);
+        // Select channels
+        const channelsToSelect = Math.min(12, finalChannels.length);
         const selectedChannels = Array.from(
           { length: channelsToSelect },
           (_, i) => i
         );
         setSelected(selectedChannels);
 
-        console.log(
-          `Selected ${selectedChannels.length} channels:`,
-          selectedChannels
-        );
-
-        // Detect main channel for HR measurement
+        // HR detection
         const det = detectMainChannels(finalChannels, 1);
         const primaryChannel =
           det.indices && det.indices.length > 0 ? det.indices[0] : 0;
         const hr = estimateHRFromChannel(finalChannels[primaryChannel], sr);
         setMeasuredHR(hr);
-        console.log("Estimated HR:", hr);
 
-        if (targetHR && hr) {
-          const t = Number(targetHR);
-          if (t > 0) {
-            setSpeed(t / hr);
-          }
-        }
-
+        // Auto-play
         if (autoPlayOnLoad) {
           setPlaying(true);
-          console.log("Auto-playing signals");
         }
 
         setMode("regular");
-
-        console.log("ECG file loaded successfully!");
-        console.log(`- Channels: ${finalChannels.length}`);
-        console.log(`- Samples per channel: ${finalChannels[0]?.length || 0}`);
-        console.log(`- Sampling rate: ${sr}Hz`);
-        console.log(`- Selected channels: ${selectedChannels.length}`);
         setUploadedFile(file);
-        // Automatic AI classification after file load
-        console.log("Starting automatic AI classification...");
+
+        console.log("File loaded successfully! Starting classification...");
         await handleClassificationSubmit(file);
       } catch (err) {
         console.error("File processing error", err);
         alert("Failed to process file: " + (err.message || err));
+
+        // Reset states on error
+        setChannels([]);
+        setPlaying(false);
       } finally {
-        e.target.value = "";
+        // DON'T clear the file input here - let the user see what they selected
+        // e.target.value = ""; // Remove this line
       }
     },
     [samplingRate, targetHR, autoPlayOnLoad]
@@ -525,20 +562,49 @@ export default function ECG() {
   const loadSyntheticData = () => {
     console.log("Loading synthetic ECG data...");
     const samplingRate = 250;
-    const duration = 30; // seconds
+    const duration = 10; // Reduce duration for smaller file
     const t = Array.from(
       { length: duration * samplingRate },
       (_, i) => i / samplingRate
     );
+
     const signals = generateSyntheticECG(t, 12);
 
-    const mockCsvContent = signals
-      .map((_, i) => [t[i], ...signals.map((ch) => ch[i])].join(","))
-      .join("\n");
-    const mockFile = new File([mockCsvContent], "synthetic_ecg.csv", {
+    // Create properly formatted CSV with time column and proper headers
+    const headers = [
+      "time",
+      "I",
+      "II",
+      "III",
+      "aVR",
+      "aVL",
+      "aVF",
+      "V1",
+      "V2",
+      "V3",
+      "V4",
+      "V5",
+      "V6",
+    ];
+
+    const rows = t.map((time, i) => {
+      const channelValues = signals.map((channel) => channel[i].toFixed(6));
+      return [time.toFixed(6), ...channelValues].join(",");
+    });
+
+    const csvContent = [headers.join(","), ...rows].join("\n");
+
+    const mockFile = new File([csvContent], "synthetic_ecg.csv", {
       type: "text/csv",
     });
-    setUploadedFile(mockFile); // NEW
+
+    console.log("Created synthetic file with proper format:");
+    console.log("- Headers:", headers);
+    console.log("- Time range:", t[0], "to", t[t.length - 1], "seconds");
+    console.log("- Sampling rate:", samplingRate, "Hz");
+    console.log("- Total samples:", t.length);
+
+    setUploadedFile(mockFile);
 
     setChannels(signals);
     setSamplingRate(samplingRate);
@@ -560,7 +626,9 @@ export default function ECG() {
       });
     }, 1000);
 
-    console.log("Synthetic ECG data loaded successfully!");
+    console.log(
+      "Synthetic ECG data loaded successfully with proper CSV format!"
+    );
   };
 
   const clearData = () => {
