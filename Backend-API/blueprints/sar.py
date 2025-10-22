@@ -48,7 +48,8 @@ def generate_and_analyze_sar_data():
     
     # 5. استخلاص وتحليل المعلومات
     
-    is_safe = max_measured_sar <= SAR_LIMIT
+    # FIX: Convert NumPy boolean to Python boolean
+    is_safe = bool(max_measured_sar <= SAR_LIMIT)
     
     if is_safe:
         status = "✅ ضمن حد الأمان."
@@ -59,13 +60,12 @@ def generate_and_analyze_sar_data():
         margin_percent = ((max_measured_sar - SAR_LIMIT) / SAR_LIMIT) * 100
         analysis_detail = f"تجاوز الحد بنسبة: {margin_percent:.2f}%."
 
-
     # 6. تجهيز البيانات للإرسال عبر JSON
     return {
         "sar_map": sar_data.tolist(),       # تحويل مصفوفة NumPy إلى قائمة قوائم للـ JSON
         "max_sar_measured": round(float(max_measured_sar), 2),
         "sar_limit": SAR_LIMIT,
-        "is_safe": is_safe,
+        "is_safe": is_safe,  # Now this is a regular Python bool
         "status": status,
         "analysis_detail": analysis_detail,
         "map_size": SIZE
