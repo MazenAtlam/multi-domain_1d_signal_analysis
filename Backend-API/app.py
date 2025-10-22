@@ -15,6 +15,7 @@ from blueprints.eeg import eeg_bp, setup_task_cleanup
 from blueprints.ecg_aliasing import ecg_aliasing_bp
 from blueprints.resample import resample_bp
 from blueprints.voice_gender import voice_gender_bp  # Add this line
+from blueprints.sar import sar_bp
 
 def create_app():
     """Create and configure the Flask application"""
@@ -46,7 +47,7 @@ def create_app():
     app.register_blueprint(resample_bp, url_prefix='/api/resample')
     app.register_blueprint(ecg_aliasing_bp, url_prefix='/api/ecg_aliasing')
     app.register_blueprint(voice_gender_bp, url_prefix='/api/voice_gender')  # Add this line
-    
+    app.register_blueprint(sar_bp, url_prefix='/api/sar')
     # Call setup functions
     setup_task_cleanup()
     
@@ -76,6 +77,11 @@ def create_app():
         """Voice gender classification frontend"""
         return render_template('voice_gender.html')
     
+    @app.route('/sar')
+    def sar_page():
+        """SAR viewer frontend"""
+        return render_template('sar_viewer.html')
+    
     # API documentation route
     @app.route('/api')
     def api_info():
@@ -100,7 +106,9 @@ def create_app():
                 '/api/ecg_aliasing/resample': 'POST - Resample ECG (safe/demo modes)',
                 '/api/voice_gender/classify': 'POST - Classify gender from voice recording',
                 '/api/voice_gender/info': 'GET - Voice gender model information',
-                '/api/voice_gender/health': 'GET - Voice gender model health'
+                '/api/voice_gender/health': 'GET - Voice gender model health',
+                '/api/sar/data': 'GET - Retrieve simulated SAR map and analysis.',
+                '/api/sar/info': 'GET - SAR API information.'
             }
         }
     
