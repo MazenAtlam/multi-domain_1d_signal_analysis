@@ -15,23 +15,32 @@ const Doppler = () => {
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [originalFile, setOriginalFile] = useState(null);
+  const [resampledDownloadUrl, setResampledDownloadUrl] = useState(null);
+  const [fileFormat, setFileFormat] = useState('wav');
+  const [resampledFile, setResampledFile] = useState(null);
 
-  // Audio state
-  const [audioUrl, setAudioUrl] = useState(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [audioLoaded, setAudioLoaded] = useState(false);
+  // Audio state - separate for original and resampled
+  const [originalAudioUrl, setOriginalAudioUrl] = useState('');
+  const [resampledAudioUrl, setResampledAudioUrl] = useState('');
+  const [originalIsPlaying, setOriginalIsPlaying] = useState(false);
+  const [resampledIsPlaying, setResampledIsPlaying] = useState(false);
+  const [originalCurrentTime, setOriginalCurrentTime] = useState(0);
+  const [resampledCurrentTime, setResampledCurrentTime] = useState(0);
+  const [originalAudioLoaded, setOriginalAudioLoaded] = useState(false);
+  const [resampledAudioLoaded, setResampledAudioLoaded] = useState(false);
   const [audioFileIndex, setAudioFileIndex] = useState(0);
   const audioFilesNumber = 4;
 
   // Refs
-  const audioRef = useRef(null);
-  const progressIntervalRef = useRef(null);
+  const originalAudioRef = useRef(null);
+  const resampledAudioRef = useRef(null);
+  const originalProgressIntervalRef = useRef(null);
+  const resampledProgressIntervalRef = useRef(null);
   const frequencyRef = useRef(null);
   const velocityRef = useRef(null);
   const durationRef = useRef(null);
-
-  const [selectedFile, setSelectedFile] = useState(null);
+  const monoOptionRef = useRef(false);
 
   const resetInputs = () => {
     frequencyRef.current.value = '';
@@ -44,23 +53,84 @@ const Doppler = () => {
 
   const resetParameters = () => {
     setDetails(null);
-    setSelectedFile(null);
-    setCurrentTime(0);
-    setAudioUrl(null);
-    setAudioLoaded(false);
+    setOriginalCurrentTime(0);
+    setOriginalAudioUrl('');
+    setOriginalFile(null);
+    setOriginalAudioLoaded(false);
+    setFileFormat('wav');
+    handleResetToOriginal();
   }
 
   // Function to get doppler car frequency and velocity
   const handleDopplerAnalysis = async (fileToDetect) => {
-    // Create FormData object
     const formData = new FormData();
     formData.append('file', fileToDetect);
 
-    // Make the API request
     return await fetch('/api/doppler/analysis', {
       method: 'POST',
       body: formData
     });
+  };
+
+  // Function to handle resampling
+  const handleResample = async (targetSr) => {
+    if (!originalFile) {
+      setMessage('No original audio file available for resampling.');
+      return;
+    }
+
+    setLoading(true);
+    setMessage('');
+
+    const formData = new FormData();
+    formData.append('file', originalFile);
+    formData.append('target_sr', targetSr.toString());
+    formData.append('mono', monoOptionRef.current.toString());
+    formData.append('format', fileFormat);
+
+    try {
+      const response = await fetch('/api/resample/', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        setMessage(errorData.error || 'Resampling failed');
+        return;
+      }
+
+      const resampledBlob = await response.blob();
+      const resampledUrl = URL.createObjectURL(resampledBlob);
+      setResampledAudioUrl(resampledUrl);
+      setResampledFile(new File([resampledBlob], `resampled.${fileFormat}`));
+
+      // Create download link
+      const downloadUrl = URL.createObjectURL(resampledBlob);
+      setResampledDownloadUrl({
+        url: downloadUrl,
+        filename: `resampled_${targetSr}Hz.${fileFormat}`
+      });
+
+      setMessage('Audio resampled successfully!');
+
+    } catch (error) {
+      setMessage('Error: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Function to reset to original audio
+  const handleResetToOriginal = () => {
+    setMessage('');
+    setResampledFile(null);
+    setResampledDownloadUrl(null);
+    setResampledAudioUrl('');
+    setResampledAudioLoaded(false);
+    setResampledCurrentTime(0);
+    setResampledIsPlaying(false);
+    stopResampledProgressUpdate();
   };
 
   // Function to handle choosing file
@@ -71,27 +141,21 @@ const Doppler = () => {
     const fileSelected = e.target.files[0];
     e.target.value = '';
     setLoading(true);
-    // Delay
     setMessage('');
 
-    if (fileSelected === undefined || !isAudioFile(fileSelected))
-    {
-      setMessage('The signal should be an audio file. Only .wav and .mp3 are supported.')
+    if (fileSelected === undefined || !isAudioFile(fileSelected)) {
+      setMessage('The signal should be an audio file. Only .wav and .mp3 are supported.');
       return;
     }
 
-    // Create object URL from the file
     const fileUrl = URL.createObjectURL(fileSelected);
-    setAudioUrl(fileUrl);
+    setOriginalAudioUrl(fileUrl);
+    setOriginalFile(fileSelected);
+    setFileFormat(fileSelected.name.split('.').pop());
 
-    console.log('Your audio uploaded successfully');
-    setSelectedFile(fileSelected);
-
-    // Analyze doppler parameters: frequency and velocity
     try {
       const response = await handleDopplerAnalysis(fileSelected);
 
-      // Check if the request was successful
       if (!response.ok) {
         const errorText = await response.text();
         setMessage(`Failed to fetch! status: ${response.status}`);
@@ -99,7 +163,6 @@ const Doppler = () => {
         return;
       }
 
-      // Parse the JSON response
       const {details} = await response.json();
       setDetails(details);
 
@@ -109,7 +172,6 @@ const Doppler = () => {
     } catch (error) {
       console.error('Error uploading signal:', error);
       setMessage(`Failed to upload signal: ${error.message}`);
-
     } finally {
       setLoading(false);
     }
@@ -128,26 +190,19 @@ const Doppler = () => {
     resetInputs();
 
     setLoading(true);
-    // Delay
     setMessage('');
 
-    // Get sample data from dataset folder
-    const fileNameFromIndex =  audioFileIndex + '.mp3';
+    const fileNameFromIndex = audioFileIndex + '.mp3';
     const fileUrl = '../testing_data/doppler/' + fileNameFromIndex;
-    setAudioUrl(fileUrl);
+    setOriginalAudioUrl(fileUrl);
+    setAudioFileIndex(audioFileIndex >= audioFilesNumber - 1 ? 0 : audioFileIndex + 1);
+    setFileFormat('mp3');
 
-    // Update the index
-    setAudioFileIndex(audioFileIndex >= audioFilesNumber - 1 ? 0 : audioFileIndex + 1)
-
-    console.log('Audio uploaded successfully');
-
-    // Analyze doppler parameters: frequency and velocity
     try {
-      const loaded = await fileFromAudioRef(audioRef, fileUrl, fileNameFromIndex);
-      setSelectedFile(loaded);
+      const loaded = await fileFromAudioRef(originalAudioRef, fileUrl, fileNameFromIndex);
+      setOriginalFile(loaded);
       const response = await handleDopplerAnalysis(loaded);
 
-      // Check if the request was successful
       if (!response.ok) {
         const errorText = await response.text();
         setMessage(`Failed to fetch! status: ${response.status}`);
@@ -155,7 +210,6 @@ const Doppler = () => {
         return;
       }
 
-      // Parse the JSON response
       const {details} = await response.json();
       setDetails(details);
 
@@ -165,7 +219,6 @@ const Doppler = () => {
     } catch (error) {
       console.error('Error uploading signal:', error);
       setMessage(`Failed to upload signal: ${error.message}`);
-
     } finally {
       setLoading(false);
     }
@@ -175,14 +228,12 @@ const Doppler = () => {
   const handleGenerateSignal = async () => {
     resetParameters();
 
-    // Validate inputs
     if (!frequency || !velocity || !duration) {
       setMessage('Please enter frequency, velocity, and duration values.');
       resetInputs();
       return;
     }
 
-    // Convert to numbers and validate
     const freqNum = parseFloat(frequency);
     const velNum = parseFloat(velocity);
     const durNum = parseFloat(duration);
@@ -197,18 +248,16 @@ const Doppler = () => {
         velNum < 5 || velNum > 60 ||
         durNum < 1 || durNum > 8) {
       setMessage('- Frequency must be in range 100-800 Hz\n' +
-                       '- Velocity must be in range 5-60 m/s\n' +
-                       '- Duration must be in range 1-8 sec');
+          '- Velocity must be in range 5-60 m/s\n' +
+          '- Duration must be in range 1-8 sec');
       resetInputs();
       return;
     }
 
     setLoading(true);
-    // Delay
     setMessage('');
 
     try {
-      // Create the request data object
       const requestData = {
         frequency: freqNum,
         velocity: velNum,
@@ -217,7 +266,6 @@ const Doppler = () => {
 
       console.log('Sending request data:', requestData);
 
-      // Make the API request
       const response = await fetch('/api/doppler/generate', {
         method: 'POST',
         headers: {
@@ -228,7 +276,7 @@ const Doppler = () => {
       });
 
       console.log('Doppler detection results:', response);
-      // Check if the request was successful
+
       if (!response.ok) {
         const errorText = await response.text();
         setMessage(`Failed to fetch! status: ${response.status}`);
@@ -237,15 +285,14 @@ const Doppler = () => {
         return;
       }
 
-      // Get the audio blob from response
       const audioBlob = await response.blob();
-
-      // Create a URL for the audio blob
       const audioUrl = URL.createObjectURL(audioBlob);
-      setAudioUrl(audioUrl);
+      setOriginalAudioUrl(audioUrl);
 
-      console.log('Audio generated successfully');
-      setSelectedFile(audioBlob);
+      const generatedFile = new File([audioBlob], 'generated_doppler.wav', { type: 'audio/wav' });
+      setOriginalFile(generatedFile);
+      setFileFormat('wav');
+
       setMessage('Signal generated successfully! Audio is ready to play.');
 
     } catch (error) {
@@ -257,90 +304,160 @@ const Doppler = () => {
     }
   };
 
-  // Function to handle audio loaded
-  const handleAudioLoaded = () => {
-    if (audioRef.current) {
-      setDuration(audioRef.current.duration);
-      setAudioLoaded(true);
-      console.log('Audio loaded, duration:', audioRef.current.duration);
+  // Original Audio Functions
+  const handleOriginalAudioLoaded = () => {
+    if (originalAudioRef.current) {
+      setDuration(originalAudioRef.current.duration);
+      setOriginalAudioLoaded(true);
+      console.log('Original audio loaded, duration:', originalAudioRef.current.duration);
     }
   };
 
-  // Function to handle audio play
-  const handlePlayAudio = () => {
-    if (audioRef.current && audioUrl) {
-      audioRef.current.play()
+  const handlePlayOriginalAudio = () => {
+    if (originalAudioRef.current && originalAudioUrl) {
+      originalAudioRef.current.play()
           .then(() => {
-            setIsPlaying(true);
-            startProgressUpdate();
+            setOriginalIsPlaying(true);
+            startOriginalProgressUpdate();
           })
           .catch(error => {
-            console.error('Error playing audio:', error);
-            setMessage('Error playing audio: ' + error.message);
+            console.error('Error playing original audio:', error);
+            setMessage('Error playing original audio: ' + error.message);
           });
     }
   };
 
-  // Function to handle audio pause
-  const handlePauseAudio = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-      stopProgressUpdate();
+  const handlePauseOriginalAudio = () => {
+    if (originalAudioRef.current) {
+      originalAudioRef.current.pause();
+      setOriginalIsPlaying(false);
+      stopOriginalProgressUpdate();
     }
   };
 
-  // Function to update progress bar
-  const updateProgress = () => {
-    if (audioRef.current) {
-      setCurrentTime(audioRef.current.currentTime);
+  const updateOriginalProgress = () => {
+    if (originalAudioRef.current) {
+      setOriginalCurrentTime(originalAudioRef.current.currentTime);
 
-      // Check if audio ended
-      if (audioRef.current.currentTime >= audioRef.current.duration) {
-        setIsPlaying(false);
-        setCurrentTime(0);
-        stopProgressUpdate();
+      if (originalAudioRef.current.currentTime >= originalAudioRef.current.duration) {
+        setOriginalIsPlaying(false);
+        setOriginalCurrentTime(0);
+        stopOriginalProgressUpdate();
       }
     }
   };
 
-  // Start progress update interval
-  const startProgressUpdate = () => {
-    progressIntervalRef.current = setInterval(updateProgress, 100);
+  const startOriginalProgressUpdate = () => {
+    originalProgressIntervalRef.current = setInterval(updateOriginalProgress, 100);
   };
 
-  // Stop progress update interval
-  const stopProgressUpdate = () => {
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current);
-      progressIntervalRef.current = null;
+  const stopOriginalProgressUpdate = () => {
+    if (originalProgressIntervalRef.current) {
+      clearInterval(originalProgressIntervalRef.current);
+      originalProgressIntervalRef.current = null;
+    }
+  };
+
+  // Resampled Audio Functions
+  const handleResampledAudioLoaded = () => {
+    if (resampledAudioRef.current) {
+      setResampledAudioLoaded(true);
+      console.log('Resampled audio loaded, duration:', resampledAudioRef.current.duration);
+    }
+  };
+
+  const handlePlayResampledAudio = () => {
+    if (resampledAudioRef.current && resampledAudioUrl) {
+      resampledAudioRef.current.play()
+          .then(() => {
+            setResampledIsPlaying(true);
+            startResampledProgressUpdate();
+          })
+          .catch(error => {
+            console.error('Error playing resampled audio:', error);
+            setMessage('Error playing resampled audio: ' + error.message);
+          });
+    }
+  };
+
+  const handlePauseResampledAudio = () => {
+    if (resampledAudioRef.current) {
+      resampledAudioRef.current.pause();
+      setResampledIsPlaying(false);
+      stopResampledProgressUpdate();
+    }
+  };
+
+  const updateResampledProgress = () => {
+    if (resampledAudioRef.current) {
+      setResampledCurrentTime(resampledAudioRef.current.currentTime);
+
+      if (resampledAudioRef.current.currentTime >= resampledAudioRef.current.duration) {
+        setResampledIsPlaying(false);
+        setResampledCurrentTime(0);
+        stopResampledProgressUpdate();
+      }
+    }
+  };
+
+  const startResampledProgressUpdate = () => {
+    resampledProgressIntervalRef.current = setInterval(updateResampledProgress, 100);
+  };
+
+  const stopResampledProgressUpdate = () => {
+    if (resampledProgressIntervalRef.current) {
+      clearInterval(resampledProgressIntervalRef.current);
+      resampledProgressIntervalRef.current = null;
     }
   };
 
   // Cleanup on component unmount
   useEffect(() => {
     return () => {
-      stopProgressUpdate();
-      if (audioUrl) {
-        URL.revokeObjectURL(audioUrl);
+      stopOriginalProgressUpdate();
+      stopResampledProgressUpdate();
+      if (originalAudioUrl) {
+        URL.revokeObjectURL(originalAudioUrl);
+      }
+      if (resampledAudioUrl) {
+        URL.revokeObjectURL(resampledAudioUrl);
       }
     };
-  }, [audioUrl]);
+  }, [originalAudioUrl, resampledAudioUrl]);
 
-  // Handle audio end
+  // Handle audio end for both players
   useEffect(() => {
-    const audio = audioRef.current;
-    if (audio) {
-      const handleEnded = () => {
-        setIsPlaying(false);
-        setCurrentTime(0);
-        stopProgressUpdate();
-      };
+    const originalAudio = originalAudioRef.current;
+    const resampledAudio = resampledAudioRef.current;
 
-      audio.addEventListener('ended', handleEnded);
-      return () => audio.removeEventListener('ended', handleEnded);
+    const handleOriginalEnded = () => {
+      setOriginalIsPlaying(false);
+      setOriginalCurrentTime(0);
+      stopOriginalProgressUpdate();
+    };
+
+    const handleResampledEnded = () => {
+      setResampledIsPlaying(false);
+      setResampledCurrentTime(0);
+      stopResampledProgressUpdate();
+    };
+
+    if (originalAudio) {
+      originalAudio.addEventListener('ended', handleOriginalEnded);
     }
-  }, [audioUrl]);
+    if (resampledAudio) {
+      resampledAudio.addEventListener('ended', handleResampledEnded);
+    }
+
+    return () => {
+      if (originalAudio) {
+        originalAudio.removeEventListener('ended', handleOriginalEnded);
+      }
+      if (resampledAudio) {
+        resampledAudio.removeEventListener('ended', handleResampledEnded);
+      }
+    };
+  }, [originalAudioUrl, resampledAudioUrl]);
 
   return (
       <div className="min-h-screen bg-background flex flex-col">
@@ -402,7 +519,7 @@ const Doppler = () => {
 
         {/* Main Content */}
         <div className="container-doppler mx-auto px-0 py-12 flex-1">
-          <div className="max-w-4xl mx-auto space-y-8">
+          <div className="max-w-6xl mx-auto space-y-8">
             {/* Action Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Generate Doppler Effect Card */}
@@ -536,7 +653,7 @@ const Doppler = () => {
               </Card>
             </div>
 
-            {/* Audio Player Section */}
+            {/* Audio Player Section - for dual viewers */}
             <Card className="p-8">
               <div className="space-y-6">
                 <div className="text-center space-y-4">
@@ -546,9 +663,9 @@ const Doppler = () => {
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                    ) : audioUrl ? (
-                        <div className="text-signal-doppler text-4xl">
-                          {isPlaying ? '🔊' : '🎵'}
+                    ) : originalAudioUrl ? (
+                        <div className="text-signal-doppler">
+                          {originalIsPlaying || resampledIsPlaying ? '🔊' : '🎵'}
                         </div>
                     ) : (
                         <svg
@@ -572,7 +689,7 @@ const Doppler = () => {
 
                   <div>
                     <h2 className="text-2xl font-semibold text-card-foreground mb-2">
-                      Audio Signal Player
+                      Audio Signal Comparison
                     </h2>
 
                     {/* Message Display */}
@@ -588,53 +705,103 @@ const Doppler = () => {
 
                     <div className="w-75 h-75 mt-4 mx-auto">
                       <Slider
-                        loading={loading}
-                        label="Sampling Frequency"
-                        unit="Hz"
-                        min={20}
-                        max={40000}
-                        OnChange={(frequency) => {console.log(`Sampling Frequency = ${frequency}`);}}
-                        handleClearAliasing={() => {console.log("Back to Original Signal");}}
-                        className="w-full rounded-lg appearance-none cursor-pointer"
+                          loading={loading}
+                          label="Sampling Frequency"
+                          unit="Hz"
+                          min={20000}
+                          max={40000}
+                          OnChange={async (frequency) => {await handleResample(frequency);}}
+                          handleClearAliasing={handleResetToOriginal}
+                          className="w-full rounded-lg appearance-none cursor-pointer"
+                          resampledDownloadUrl={resampledDownloadUrl}
                       >
                       </Slider>
                     </div>
                   </div>
                 </div>
 
-                <div className="audio-player">
-                  <div className="text-center space-y-4">
-                    <div className="space-y-2">
-                      <SoundVisualizer file={selectedFile} audioRef={audioRef} />
-                      <p className="text-sm text-muted-foreground">{formatTime(currentTime)} / {duration ? formatTime(parseFloat(duration)) : formatTime(0)}</p>
-                    </div>
+                {/* Dual Audio Players */}
+                <div className="flex align-items-center justify-content-between">
+                  {/* Original Audio Player */}
+                  <Card className="w-full p-6">
+                    <div className="text-center space-y-4">
+                      <h3 className="text-lg font-semibold text-card-foreground">Original Audio</h3>
 
-                    <div className="flex justify-center space-x-4">
-                          {isPlaying ? (
-                              <Button
-                                  className="button btn btn-outline-danger"
-                                  onClick={handlePauseAudio}
-                              >
-                                ⏸️ Pause Audio
-                              </Button>
-                          ) : (
-                              <Button
-                                  className="button player-btn button-scientific"
-                                  onClick={handlePlayAudio}
-                                  disabled={!audioLoaded}
-                              >
-                                ▶️ Play Audio
-                              </Button>
-                          )}
+                      <div className="space-y-2">
+                        <SoundVisualizer file={originalFile} audioRef={originalAudioRef} />
+                        <p className="text-sm text-muted-foreground">
+                          {formatTime(originalCurrentTime)} / {duration ? formatTime(parseFloat(duration)) : formatTime(0)}
+                        </p>
+                      </div>
+
+                      <div className="flex justify-center space-x-4">
+                        {originalIsPlaying ? (
+                            <Button
+                                className="button btn btn-outline-danger"
+                                onClick={handlePauseOriginalAudio}
+                            >
+                              ⏸️ Pause
+                            </Button>
+                        ) : (
+                            <Button
+                                className="button player-btn button-scientific"
+                                onClick={handlePlayOriginalAudio}
+                                disabled={!originalAudioLoaded}
+                            >
+                              ▶️ Play Original
+                            </Button>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Resampled Audio Player */}
+                  {resampledAudioUrl && (
+                      <Card className="w-full p-6">
+                        <div className="text-center space-y-4">
+                          <h3 className="text-lg font-semibold text-card-foreground">Resampled Audio</h3>
+
+                          <div className="space-y-2">
+                            <SoundVisualizer file={resampledFile} audioRef={resampledAudioRef} />
+                            <p className="text-sm text-muted-foreground">
+                              {formatTime(resampledCurrentTime)} / {duration ? formatTime(parseFloat(duration)) : formatTime(0)}
+                            </p>
+                          </div>
+
+                          <div className="flex justify-center space-x-4">
+                            {resampledIsPlaying ? (
+                                <Button
+                                    className="button btn btn-outline-danger"
+                                    onClick={handlePauseResampledAudio}
+                                >
+                                  ⏸️ Pause
+                                </Button>
+                            ) : (
+                                <Button
+                                    className="button player-btn button-scientific"
+                                    onClick={handlePlayResampledAudio}
+                                    disabled={!resampledAudioLoaded}
+                                >
+                                  ▶️ Play Resampled
+                                </Button>
+                            )}
+                          </div>
                         </div>
-                  </div>
+                      </Card>
+                  )}
                 </div>
 
-                {/* Hidden audio element */}
+                {/* Hidden audio elements */}
                 <audio
-                    ref={audioRef}
-                    src={audioUrl || null}
-                    onLoadedMetadata={handleAudioLoaded}
+                    ref={originalAudioRef}
+                    src={originalAudioUrl || null}
+                    onLoadedMetadata={handleOriginalAudioLoaded}
+                    preload="metadata"
+                />
+                <audio
+                    ref={resampledAudioRef}
+                    src={resampledAudioUrl || null}
+                    onLoadedMetadata={handleResampledAudioLoaded}
                     preload="metadata"
                 />
 
