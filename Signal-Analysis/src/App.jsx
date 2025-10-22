@@ -4,6 +4,7 @@ import EEG from "./../Pages/EEG";
 import ECG from "./../Pages/ECG";
 import Radar from "../Pages/Radar";
 import Doppler from "./../Pages/Doppler";
+import Recognition from "../Pages/Recognition.jsx";
 import "../styles/index.css"
 import "../styles/doppler.css"
 import "../styles/radar.css"
@@ -18,6 +19,7 @@ function App() {
           <Route path="/ECG" element={<ECG />} />
           <Route path="/Radar" element={<Radar />} />
           <Route path="/Doppler" element={<Doppler />} />
+          <Route path="/Recognition" element={<Recognition />} />
           <Route path="/Home" element={<Home />} />
         </Routes>
       </BrowserRouter>
