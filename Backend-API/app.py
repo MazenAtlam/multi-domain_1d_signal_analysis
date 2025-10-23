@@ -15,7 +15,8 @@ from blueprints.eeg import eeg_bp, setup_task_cleanup
 from blueprints.ecg_aliasing import ecg_aliasing_bp
 from blueprints.resample import resample_bp
 from blueprints.eeg_aliasing import eeg_aliasing_bp
-from blueprints.voice_gender import voice_gender_bp  # Add this line
+from blueprints.voice_gender import voice_gender_bp
+from blueprints.alias_recover import alias_recover_bp
 
 def create_app():
     """Create and configure the Flask application"""
@@ -46,8 +47,9 @@ def create_app():
     app.register_blueprint(eeg_bp, url_prefix='/api/eeg')
     app.register_blueprint(resample_bp, url_prefix='/api/resample')
     app.register_blueprint(ecg_aliasing_bp, url_prefix='/api/ecg_aliasing')
-    app.register_blueprint(voice_gender_bp, url_prefix='/api/voice_gender')  # Add this line
+    app.register_blueprint(voice_gender_bp, url_prefix='/api/voice_gender')
     app.register_blueprint(eeg_aliasing_bp, url_prefix='/api/eeg_aliasing')
+    app.register_blueprint(alias_recover_bp, url_prefix='/api/alias_recover')
 
     # Call setup functions
     setup_task_cleanup()
@@ -82,12 +84,17 @@ def create_app():
     def eeg_aliasing_page():
         """EEG aliasing test frontend"""
         return render_template('eeg_aliasing.html')
+        
+    @app.route('/alias_recover')
+    def alias_recover_page():
+        """Audio alias recovery frontend"""
+        return render_template('alias_recover.html')
 
     # API documentation route
     @app.route('/api')
     def api_info():
         """API documentation and status"""
-        return {
+        info = {
             'status': 'operational',
             'version': '1.0.0',
             'endpoints': {
@@ -107,9 +114,17 @@ def create_app():
                 '/api/ecg_aliasing/resample': 'POST - Resample ECG (safe/demo modes)',
                 '/api/voice_gender/classify': 'POST - Classify gender from voice recording',
                 '/api/voice_gender/info': 'GET - Voice gender model information',
-                '/api/voice_gender/health': 'GET - Voice gender model health'
+                '/api/voice_gender/health': 'GET - Voice gender model health',
+                '/api/eeg_aliasing/generate/8ch': 'GET - Generate 8-channel synthetic EEG',
+                '/api/eeg_aliasing/generate/32ch': 'GET - Generate 32-channel synthetic EEG',
+                '/api/eeg_aliasing/analyze': 'POST - Analyze EEG and estimate Fmax',
+                '/api/eeg_aliasing/resample': 'POST - Resample EEG (safe/demo modes)',
+                '/api/alias_recover/recover': 'POST - Recover high-quality audio from aliased audio',
+                '/api/alias_recover/info': 'GET - Get audio alias recovery model information',
+                '/api/alias_recover/health': 'GET - Check audio alias recovery model health'
             }
         }
+        return info
     
     # Handle chunked transfers
     @app.before_request
