@@ -20,6 +20,8 @@
       * [In-App](#in-app-2)
     * [Radar Signals](#radar-signals)
       * [In-App](#in-app-3)
+    * [Voice Recognition](#voice-recognition)
+      * [In-App](#in-app-4)
   * [License](#license)
   * [Acknowledgments](#acknowledgments)
 <!-- TOC -->
@@ -61,7 +63,7 @@ This project was developed as part of a Digital Signal Processing course, demons
 4. Start the development server:
     ```bash
     cd Signal-Analysis  # From root
-    npm start
+    npm run dev
     ```
 
 5. Start the backend API (in a separate terminal):
@@ -75,6 +77,7 @@ This project was developed as part of a Digital Signal Processing course, demons
 - **Medical Signals**: Upload ECG/EEG data files to visualize signals and receive AI-powered abnormality detection
 - **Acoustic Analysis**: Generate Doppler effect sounds or analyze real vehicle recordings to estimate velocity and frequency
 - **Radar Classification**: Process SAR images to classify terrain types or detect drone signals
+- **Voice Recognition**: Analyze voice samples to detect speaker gender with aliasing and antialiasing capabilities
 - **Multiple Viewers**: Switch between continuous-time, XOR, polar, and recurrence plot visualizations
 
 ## Technologies Used
@@ -119,10 +122,13 @@ This project was developed as part of a Digital Signal Processing course, demons
 - Multiple viewing modes (continuous, XOR, polar, recurrence)
 - Real-time AI-based diagnosis
 - Zoom, pan, and playback controls
+- Aliasing effects demonstration in standard mode
 
 #### In-App
 
-- [ECG Polar Graph](https://github.com/user-attachments/assets/b8e2810a-8cba-492e-80ef-fd56210a2e37)
+- [ECG Polar Graph](https://github.com/user-attachments/assets/49696ec2-cf48-4ee8-ada8-4e7a1017b80f)
+
+- [ECG XOR Graph](https://github.com/user-attachments/assets/1202889e-fcfa-485c-85ea-c503a3ac5fcc)
 
 ![Channels](deliverables/ECG/channels.jpg)
 
@@ -138,10 +144,13 @@ This project was developed as part of a Digital Signal Processing course, demons
 - Brain activity pattern recognition
 - Abnormality classification (seizure, sleep disorders, etc.)
 - Customizable channel selection and color mapping
+- Aliasing effects demonstration in standard mode
 
 #### In-App
 
-- [EEG Polar Graph](https://github.com/user-attachments/assets/76387d0a-e957-418f-98c3-2a7375eb19a9)
+- [EEG Polar Graph](https://github.com/user-attachments/assets/ab507126-af28-434b-8c97-5d0813e97a32)
+
+- [EEG XOR Graph](https://github.com/user-attachments/assets/016bcc41-0216-47ff-9b03-dc802c8c92be)
 
 ![Classification Output](deliverables/EEG/classification.jpg)
 
@@ -159,8 +168,11 @@ This project was developed as part of a Digital Signal Processing course, demons
 - Real vehicle passing sound analysis
 - AI-based velocity and frequency estimation
 - Interactive parameter controls
+- Aliasing effects demonstration
 
 #### In-App
+
+- [Audio Aliasing](https://github.com/user-attachments/assets/f2e9969a-a630-45d0-951f-e5789644b9a6)
 
 |                    Doppler Sound Generation                    |                    Doppler Analysis                     |
 |:--------------------------------------------------------------:|:-------------------------------------------------------:|
@@ -184,6 +196,25 @@ This project was developed as part of a Digital Signal Processing course, demons
 ![Drone Detection](deliverables/Radar/drone.jpg)
 
 ![Features Cards and Guidelines](deliverables/Radar/features_guidelines.jpg)
+
+---
+
+### Voice Recognition
+
+![Voice Recognition](deliverables/Voice_Recognition/input_forms.jpg)
+
+- Voice sample analysis for gender detection (male/female)
+- Real-time audio processing and feature extraction
+- Aliasing effects demonstration
+- Anti-aliasing implementation to correct aliased female voices to restore original characteristics
+- Spectral analysis and voice pattern visualization
+
+#### In-App
+
+- [Voice Analysis & Aliasing Results](https://github.com/user-attachments/assets/209cf6c3-2ecb-44e2-a0b0-954a762fdff9)
+- [Anti-aliasing Process](https://github.com/user-attachments/assets/7d64d3c7-4e43-455d-8319-b9878dd0092e)
+
+![Features Cards and Guidelines](deliverables/Voice_Recognition/features_guidelines.jpg)
 
 ## License
 

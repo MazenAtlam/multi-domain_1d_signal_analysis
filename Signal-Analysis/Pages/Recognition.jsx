@@ -416,8 +416,8 @@
 //                             loading={antiAliasLoading}
 //                             label="Sampling Frequency"
 //                             unit="Hz"
-//                             min={20000}
-//                             max={40000}
+//                             min={3000}
+//                             max={48000}
 //                             initialValue={0}
 //                             OnChange={handleSamplingFrequencyChange}
 //                             handleClearAliasing={() => setSamplingFrequency(40000)}
@@ -1507,6 +1507,7 @@ const Recognition = () => {
   const [message, setMessage] = useState("");
   const [recognitionResult, setRecognitionResult] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isOriginalPlaying, setIsOriginalPlaying] = useState(false);
   const [audioLoaded, setAudioLoaded] = useState(false);
 
   // State for audio resampling
@@ -1557,6 +1558,7 @@ const Recognition = () => {
     const fileUrl = URL.createObjectURL(fileSelected);
     setAudioUrl(fileUrl);
     setSelectedFile(fileSelected);
+    setResampleFile(fileSelected);
 
     try {
       console.log("Processing voice recognition...");
@@ -1662,8 +1664,8 @@ const Recognition = () => {
     }
   };
 
-  const handleResampleAudio = async () => {
-    if (!resampleFile || !audioAnalysis) {
+  const handleResampleAudio = async (frequency=null) => {
+    if (!resampleFile || !(audioAnalysis || recognitionResult)) {
       setResampleMessage("Please select an audio file first.");
       return;
     }
@@ -1672,29 +1674,29 @@ const Recognition = () => {
     setResampleMessage("Processing audio resampling...");
 
     try {
-      // Validate sampling rate
-      const validation = validateSamplingRate(
-        samplingFrequency,
-        audioAnalysis.fmax_estimate,
-        audioAnalysis.safe_min
-      );
-
-      if (validation.warnings.length > 0) {
-        console.warn("Sampling rate warnings:", validation.warnings);
-        setResampleMessage(
-          `Warning: ${validation.warnings[0]}. Processing anyway...`
-        );
-      }
+      // // Validate sampling rate
+      // const validation = validateSamplingRate(
+      //     frequency ? frequency : samplingFrequency,
+      //   audioAnalysis.fmax_estimate,
+      //   audioAnalysis.safe_min
+      // );
+      //
+      // if (validation.warnings.length > 0) {
+      //   console.warn("Sampling rate warnings:", validation.warnings);
+      //   setResampleMessage(
+      //     `Warning: ${validation.warnings[0]}. Processing anyway...`
+      //   );
+      // }
 
       // Perform resampling
-      const blob = await handleAudioResampling(resampleFile, samplingFrequency);
+      const blob = await handleAudioResampling(resampleFile, frequency ? frequency : samplingFrequency);
       setResampledBlob(blob);
 
       const processedUrl = URL.createObjectURL(blob);
       setResampledAudioUrl(processedUrl);
 
       setResampleMessage(
-        `✅ Audio resampling completed successfully! New sample rate: ${samplingFrequency} Hz`
+        `✅ Audio resampling completed successfully! New sample rate: ${frequency ? frequency : samplingFrequency} Hz`
       );
     } catch (error) {
       console.error("Error processing audio:", error);
@@ -1766,17 +1768,17 @@ const Recognition = () => {
     setAudioLoaded(true);
   };
 
-  const handleSamplingFrequencyChange = (frequency) => {
-    setSamplingFrequency(frequency);
-    console.log(`Sampling Frequency changed to: ${frequency} Hz`);
-
-    // Show warning if below safe minimum
-    if (audioAnalysis && frequency < audioAnalysis.safe_min) {
-      setResampleMessage(
-        `Warning: Sampling rate (${frequency} Hz) is below safe minimum (${audioAnalysis.safe_min} Hz). This may cause aliasing.`
-      );
-    }
-  };
+  // const handleSamplingFrequencyChange = (frequency) => {
+  //   setSamplingFrequency(frequency);
+  //   console.log(`Sampling Frequency changed to: ${frequency} Hz`);
+  //
+  //   // Show warning if below safe minimum
+  //   if (audioAnalysis && frequency < audioAnalysis.safe_min) {
+  //     setResampleMessage(
+  //       `Warning: Sampling rate (${frequency} Hz) is below safe minimum (${audioAnalysis.safe_min} Hz). This may cause aliasing.`
+  //     );
+  //   }
+  // };
 
   const handleResetResampling = () => {
     setSamplingFrequency(audioAnalysis?.orig_sr || 44100);
@@ -2074,46 +2076,46 @@ const Recognition = () => {
           </div>
 
           {/* Sampling Frequency Slider - Only show when audio is loaded */}
-          {audioAnalysis && (
+          {(recognitionResult || audioAnalysis) && (
             <Card className="p-6">
               <div className="mt-4">
                 <Slider
                   loading={resampleLoading}
                   label="Target Sampling Frequency"
                   unit="Hz"
-                  min={Math.min(8000, audioAnalysis.demo_min)}
-                  max={Math.max(48000, audioAnalysis.orig_sr)}
-                  initialValue={samplingFrequency}
-                  OnChange={handleSamplingFrequencyChange}
+                  min={3000}
+                  max={48000}
+                  initialValue={0}
+                  OnChange={async (frequency) => await handleResampleAudio(frequency)}
                   handleClearAliasing={handleResetResampling}
                   className="w-full"
                 />
 
-                {samplingFrequency < audioAnalysis.safe_min && (
-                  <div className="mt-2 p-2 bg-warning/10 border border-warning/20 rounded text-warning text-sm">
-                    ⚠️ Sampling rate below safe minimum (
-                    {audioAnalysis.safe_min} Hz). May cause aliasing.
-                  </div>
-                )}
+                {/*{samplingFrequency < audioAnalysis.safe_min && (*/}
+                {/*  <div className="mt-2 p-2 bg-warning/10 border border-warning/20 rounded text-warning text-sm">*/}
+                {/*    ⚠️ Sampling rate below safe minimum (*/}
+                {/*    {audioAnalysis.safe_min} Hz). May cause aliasing.*/}
+                {/*  </div>*/}
+                {/*)}*/}
 
-                <div className="mt-4 flex justify-center space-x-3">
-                  <Button
-                    className="btn btn-primary"
-                    onClick={handleResampleAudio}
-                    disabled={resampleLoading}
-                  >
-                    {resampleLoading ? "🔄 Processing..." : "🔄 Resample Audio"}
-                  </Button>
+                {/*<div className="mt-4 flex justify-center space-x-3">*/}
+                {/*  <Button*/}
+                {/*    className="btn btn-primary"*/}
+                {/*    onClick={handleResampleAudio}*/}
+                {/*    disabled={resampleLoading}*/}
+                {/*  >*/}
+                {/*    {resampleLoading ? "🔄 Processing..." : "🔄 Resample Audio"}*/}
+                {/*  </Button>*/}
 
-                  {resampledBlob && (
-                    <Button
-                      className="btn btn-success"
-                      onClick={handleDownloadResampledAudio}
-                    >
-                      ⬇️ Download Resampled Audio
-                    </Button>
-                  )}
-                </div>
+                {/*  {resampledBlob && (*/}
+                {/*    <Button*/}
+                {/*      className="btn btn-success"*/}
+                {/*      onClick={handleDownloadResampledAudio}*/}
+                {/*    >*/}
+                {/*      ⬇️ Download Resampled Audio*/}
+                {/*    </Button>*/}
+                {/*  )}*/}
+                {/*</div>*/}
               </div>
             </Card>
           )}
@@ -2333,14 +2335,25 @@ const Recognition = () => {
                           <p className="text-sm text-muted-foreground mb-2">
                             Original Audio:
                           </p>
-                          <Button
-                            className="btn btn-outline-secondary btn-sm"
-                            onClick={() =>
-                              handlePlayAudio(originalAudioRef, () => {})
-                            }
-                          >
-                            ▶️ Play Original
-                          </Button>
+                          {isOriginalPlaying ? (
+                              <Button
+                                  className="btn btn-outline-secondary btn-sm"
+                                  onClick={() =>
+                                      handlePauseAudio(originalAudioRef, setIsOriginalPlaying)
+                                  }
+                              >
+                                ⏸️ Pause Original
+                              </Button>
+                          ) : (
+                              <Button
+                                  className="btn btn-secondary btn-sm"
+                                  onClick={() =>
+                                      handlePlayAudio(originalAudioRef, setIsOriginalPlaying)
+                                  }
+                              >
+                                ▶️ Play Original
+                              </Button>
+                          )}
                           <audio
                             ref={originalAudioRef}
                             src={originalAudioUrl}

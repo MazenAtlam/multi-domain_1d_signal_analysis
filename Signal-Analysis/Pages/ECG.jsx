@@ -861,7 +861,7 @@ export default function ECG() {
             </small>
           </Card>
         )}
-        // NEW: Resampling Controls Card
+        {/*NEW: Resampling Controls Card*/}
         {channels.length > 0 && mode === "regular" && requiredFmax > 0 && (
           <Card className="p-3 mb-3 col-10 col-xl-6 mx-auto d-flex flex-column gap-3">
             <h6>Resampling Mode Selection</h6>

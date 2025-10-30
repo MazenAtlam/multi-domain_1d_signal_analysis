@@ -708,8 +708,8 @@ const Doppler = () => {
                           loading={loading}
                           label="Sampling Frequency"
                           unit="Hz"
-                          min={20000}
-                          max={40000}
+                          min={3000}
+                          max={48000}
                           OnChange={async (frequency) => {await handleResample(frequency);}}
                           handleClearAliasing={handleResetToOriginal}
                           className="w-full rounded-lg appearance-none cursor-pointer"
